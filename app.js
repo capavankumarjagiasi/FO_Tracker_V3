@@ -4,7 +4,7 @@
    ══════════════════════════════════════════════════════════════════════ */
 
 // ── Config — CHANGE THIS URL to your GitHub raw JSON URL ─────────────
-const DATA_URL = 'https://raw.githubusercontent.com/YOUR_GITHUB_USER/YOUR_REPO/main/fo_snapshot_v3.json';
+const DATA_URL = 'https://raw.githubusercontent.com/capavankumarjagiasi/FO_Tracker_V3/main/fo_snapshot_v3.json';
 const REFRESH_MS = 5 * 60 * 1000;  // 5 min
 
 // ── Global state ──────────────────────────────────────────────────────
