@@ -1,0 +1,1695 @@
+<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1a3a5c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="F&O Tracker">
+  <meta name="description" content="NSE Futures & Options EOD Data Tracker by SDK Fintech">
+  <title>NSE F&O Tracker</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+/* ── CSS Variables ───────────────────────────────────────────────────── */
+:root {
+  --bg:      #0d1b2a;
+  --panel:   #1a2e42;
+  --panel2:  #1f3850;
+  --fg:      #d0e8f8;
+  --fg2:     #7ca8c8;
+  --accent:  #1a7abf;
+  --green:   #22c55e;
+  --red:     #ef4444;
+  --amber:   #f59e0b;
+  --purple:  #a855f7;
+  --blue:    #3b82f6;
+  --border:  #2a3f54;
+  --shadow:  rgba(0,0,0,0.4);
+  --tab-h:   56px;
+  --head-h:  48px;
+  --radius:  8px;
+}
+body.light {
+  --bg:      #f0f4f8;
+  --panel:   #ffffff;
+  --panel2:  #e8f0f8;
+  --fg:      #1a2e42;
+  --fg2:     #4a6a8a;
+  --border:  #c8d8e8;
+  --shadow:  rgba(0,0,0,0.1);
+}
+
+/* ── Reset ───────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 13px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────── */
+#header {
+  height: var(--head-h);
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 8px;
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px var(--shadow);
+}
+#header h1 { font-size: 15px; font-weight: 700; color: var(--fg); flex: 1; }
+#header h1 span { color: var(--accent); }
+#data-ts { font-size: 11px; color: var(--fg2); white-space: nowrap; }
+#theme-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--fg2); font-size: 16px; padding: 4px;
+}
+#refresh-btn {
+  background: var(--accent); border: none; cursor: pointer;
+  color: #fff; font-size: 11px; padding: 4px 10px;
+  border-radius: 4px; font-weight: 600;
+}
+
+/* ── Offline banner ──────────────────────────────────────────────────── */
+#offline-banner {
+  display: none;
+  background: var(--amber);
+  color: #000;
+  text-align: center;
+  font-size: 11px;
+  padding: 4px;
+  position: fixed;
+  top: var(--head-h);
+  left: 0; right: 0;
+  z-index: 99;
+}
+#offline-banner.show { display: block; }
+
+/* ── Main content area ───────────────────────────────────────────────── */
+#content {
+  position: fixed;
+  top: var(--head-h);
+  bottom: var(--tab-h);
+  left: 0; right: 0;
+  overflow: hidden;
+}
+#content.has-banner { top: calc(var(--head-h) + 24px); }
+
+/* ── Tab pages ───────────────────────────────────────────────────────── */
+.page {
+  display: none;
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+.page.active { display: block; }
+
+/* ── Bottom tab bar ──────────────────────────────────────────────────── */
+#tabbar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: var(--tab-h);
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  display: flex;
+  z-index: 100;
+}
+.tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--fg2);
+  font-size: 10px;
+  padding: 4px 2px;
+  transition: color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tab-btn .icon { font-size: 18px; line-height: 1; }
+.tab-btn.active { color: var(--accent); }
+.tab-btn.active .icon { transform: scale(1.1); }
+
+/* ── Cards & Tables ──────────────────────────────────────────────────── */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.card-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--fg2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+/* Summary cards row */
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.summary-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  text-align: center;
+}
+.summary-card .val {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.summary-card .lbl { font-size: 10px; color: var(--fg2); margin-top: 2px; }
+.summary-card .chg { font-size: 12px; font-weight: 600; margin-top: 2px; }
+
+/* Table */
+.tbl-wrap { overflow-x: auto; border-radius: var(--radius); }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+th {
+  background: var(--panel2);
+  color: var(--fg2);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 6px 8px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+th:hover { color: var(--fg); }
+td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  color: var(--fg);
+}
+tr:last-child td { border-bottom: none; }
+tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+tr.lb td { color: #22c55e; font-weight: 600; }
+tr.sb td { color: #ef4444; font-weight: 600; }
+tr.lu td { color: #f59e0b; }
+tr.sc td { color: #a855f7; }
+
+/* Signal badge */
+.sig {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.sig-lb { background: #064e1a; color: #22c55e; }
+.sig-sb { background: #4e0606; color: #ef4444; }
+.sig-lu { background: #4e3006; color: #f59e0b; }
+.sig-sc { background: #2e0650; color: #a855f7; }
+
+/* ── Colour helpers ──────────────────────────────────────────────────── */
+.up   { color: var(--green); }
+.down { color: var(--red); }
+.neu  { color: var(--fg2); }
+.bold { font-weight: 700; }
+
+/* ── Section header ──────────────────────────────────────────────────── */
+.sec-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--fg);
+}
+.sec-head::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ── Filter bar ──────────────────────────────────────────────────────── */
+.filter-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  align-items: center;
+}
+.filter-bar input, .filter-bar select {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--fg);
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 12px;
+  outline: none;
+}
+.filter-bar input { flex: 1; min-width: 120px; }
+.filter-bar select { min-width: 110px; }
+
+/* ── OI Heatmap tiles ────────────────────────────────────────────────── */
+#heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 4px;
+  margin-top: 8px;
+}
+.hm-tile {
+  border-radius: 6px;
+  padding: 8px 6px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.1s;
+  min-height: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.hm-tile:active { transform: scale(0.96); }
+.hm-tile .hm-sym { font-size: 11px; font-weight: 700; }
+.hm-tile .hm-ltp { font-size: 13px; font-weight: 700; }
+.hm-tile .hm-pct { font-size: 10px; }
+.hm-tile .hm-oi  { font-size: 9px; opacity: 0.85; }
+.hm-tile .hm-sig { font-size: 9px; font-weight: 700; margin-top: 2px; }
+
+/* ── Rollover progress bar ───────────────────────────────────────────── */
+.roll-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 3px;
+  overflow: hidden;
+}
+.roll-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 0.3s;
+}
+
+/* ── Bottom sheet ────────────────────────────────────────────────────── */
+#sheet-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+}
+#sheet-overlay.show { display: block; }
+#bottom-sheet {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--panel);
+  border-radius: 16px 16px 0 0;
+  padding: 16px;
+  max-height: 70vh;
+  overflow-y: auto;
+  z-index: 201;
+  transform: translateY(100%);
+  transition: transform 0.25s ease;
+}
+#bottom-sheet.open { transform: translateY(0); }
+.sheet-handle {
+  width: 36px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto 12px;
+}
+.sheet-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
+.sheet-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.sheet-row:last-child { border-bottom: none; }
+.sheet-row .lbl { color: var(--fg2); }
+.sheet-row .val { font-weight: 600; }
+
+/* ── Skeleton loader ─────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--panel) 25%, var(--panel2) 50%, var(--panel) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  border-radius: 4px;
+  height: 14px;
+  margin-bottom: 6px;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+/* ── Toast ───────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: calc(var(--tab-h) + 12px);
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--panel2);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 300;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── Error state ─────────────────────────────────────────────────────── */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 12px;
+  color: var(--fg2);
+  text-align: center;
+}
+.error-state .err-icon { font-size: 36px; }
+.retry-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── Pull to refresh spinner ─────────────────────────────────────────── */
+#ptr-spinner {
+  display: none;
+  text-align: center;
+  padding: 8px;
+  color: var(--accent);
+  font-size: 18px;
+  animation: spin 0.8s linear infinite;
+}
+#ptr-spinner.show { display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Mini sparkline ──────────────────────────────────────────────────── */
+.spark { display: inline-block; vertical-align: middle; }
+
+/* ── Ban badge ───────────────────────────────────────────────────────── */
+.ban-badge {
+  display: inline-block;
+  background: #7f1d1d;
+  color: #fca5a5;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-right: 3px;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+@media (min-width: 600px) {
+  .summary-row { grid-template-columns: repeat(4, 1fr); }
+  #heatmap-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  #tabbar { max-width: 600px; margin: 0 auto; }
+}
+
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div id="header">
+    <h1>NSE <span>F&amp;O</span> Tracker</h1>
+    <span id="data-ts" title="Last data date">—</span>
+    <button id="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀️</button>
+    <button id="refresh-btn" onclick="loadData(true)">↻</button>
+  </div>
+
+  <!-- Offline banner -->
+  <div id="offline-banner"></div>
+
+  <!-- Content -->
+  <div id="content">
+
+    <div id="page-pulse" class="page active">
+      <div class="skeleton" style="height:80px;margin-bottom:8px"></div>
+      <div class="skeleton" style="height:40px;margin-bottom:8px"></div>
+      <div class="skeleton" style="height:200px"></div>
+    </div>
+
+    <div id="page-futures" class="page">
+      <div class="skeleton" style="height:40px;margin-bottom:8px"></div>
+      <div class="skeleton" style="height:300px"></div>
+    </div>
+
+    <div id="page-oi" class="page">
+      <div class="skeleton" style="height:40px;margin-bottom:8px"></div>
+      <div class="skeleton" style="height:300px"></div>
+    </div>
+
+    <div id="page-rollover" class="page">
+      <div class="skeleton" style="height:120px;margin-bottom:8px"></div>
+      <div class="skeleton" style="height:300px"></div>
+    </div>
+
+    <div id="page-basis" class="page">
+      <div class="skeleton" style="height:60px;margin-bottom:8px"></div>
+      <div class="skeleton" style="height:300px"></div>
+    </div>
+
+  </div>
+
+  <!-- Bottom sheet -->
+  <div id="sheet-overlay"></div>
+  <div id="bottom-sheet"></div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <!-- Tab bar -->
+  <nav id="tabbar">
+    <button id="tab-pulse"    class="tab-btn active" onclick="switchTab('pulse')">
+      <span class="icon">📊</span><span>Pulse</span>
+    </button>
+    <button id="tab-futures"  class="tab-btn" onclick="switchTab('futures')">
+      <span class="icon">📈</span><span>Futures</span>
+    </button>
+    <button id="tab-oi"       class="tab-btn" onclick="switchTab('oi')">
+      <span class="icon">🔥</span><span>OI</span>
+    </button>
+    <button id="tab-rollover" class="tab-btn" onclick="switchTab('rollover')">
+      <span class="icon">🔄</span><span>Rollover</span>
+    </button>
+    <button id="tab-basis"    class="tab-btn" onclick="switchTab('basis')">
+      <span class="icon">⚖️</span><span>Basis</span>
+    </button>
+  </nav>
+
+  <script>
+/* ══════════════════════════════════════════════════════════════════════
+   app.js — NSE F&O Tracker PWA — SDK Fintech
+   Main: data load, router, tab nav, utilities
+   ══════════════════════════════════════════════════════════════════════ */
+
+// ── Config — CHANGE THIS URL to your GitHub raw JSON URL ─────────────
+const DATA_URL = 'https://raw.githubusercontent.com/YOUR_GITHUB_USER/YOUR_REPO/main/fo_snapshot_v3.json';
+const REFRESH_MS = 5 * 60 * 1000;  // 5 min
+
+// ── Global state ──────────────────────────────────────────────────────
+window.FO = {
+  data:      null,
+  loading:   false,
+  lastFetch: null,
+  offline:   false,
+  tab:       'pulse',
+};
+
+// ── DOM refs ──────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+// ── Register service worker ───────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+  navigator.serviceWorker.addEventListener('message', e => {
+    if (e.data?.type === 'BG_REFRESH') loadData();
+  });
+}
+
+// ── Data loader ───────────────────────────────────────────────────────
+async function loadData(force = false) {
+  if (FO.loading) return;
+  FO.loading = true;
+  showPTR(true);
+
+  try {
+    const url = force ? DATA_URL + '?t=' + Date.now() : DATA_URL;
+    const resp = await fetch(url, { cache: force ? 'no-cache' : 'default' });
+
+    if (resp.ok) {
+      FO.data     = await resp.json();
+      FO.lastFetch = new Date();
+      FO.offline  = false;
+      setOfflineBanner(false);
+      updateTimestamp();
+      renderCurrentTab();
+      showToast('Data updated · ' + fmt_time(FO.lastFetch));
+    } else {
+      throw new Error('HTTP ' + resp.status);
+    }
+  } catch (err) {
+    // Try cache
+    try {
+      const cached = await caches.match(DATA_URL);
+      if (cached) {
+        FO.data    = await cached.json();
+        FO.offline = true;
+        setOfflineBanner(true, FO.data?.meta?.date_fmt);
+        updateTimestamp();
+        renderCurrentTab();
+      } else {
+        showError();
+      }
+    } catch {
+      showError();
+    }
+  } finally {
+    FO.loading = false;
+    showPTR(false);
+  }
+}
+
+// ── Tab router ────────────────────────────────────────────────────────
+const TAB_RENDERERS = {
+  pulse:    () => window.renderPulse    && renderPulse(FO.data),
+  futures:  () => window.renderFutures  && renderFutures(FO.data),
+  oi:       () => window.renderOI       && renderOI(FO.data),
+  rollover: () => window.renderRollover && renderRollover(FO.data),
+  basis:    () => window.renderBasis    && renderBasis(FO.data),
+};
+
+function switchTab(name) {
+  FO.tab = name;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const pg = $('page-' + name);
+  if (pg) pg.classList.add('active');
+  const btn = $('tab-' + name);
+  if (btn) btn.classList.add('active');
+  renderCurrentTab();
+}
+
+function renderCurrentTab() {
+  if (!FO.data) return;
+  const fn = TAB_RENDERERS[FO.tab];
+  if (fn) try { fn(); } catch(e) { console.error('Render error:', e); }
+}
+
+// ── Swipe navigation ──────────────────────────────────────────────────
+const TABS = ['pulse','futures','oi','rollover','basis'];
+let touchX0 = 0;
+document.addEventListener('touchstart', e => { touchX0 = e.touches[0].clientX; }, {passive: true});
+document.addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - touchX0;
+  if (Math.abs(dx) < 60) return;
+  const idx = TABS.indexOf(FO.tab);
+  if (dx < 0 && idx < TABS.length - 1) switchTab(TABS[idx + 1]);
+  if (dx > 0 && idx > 0)               switchTab(TABS[idx - 1]);
+}, {passive: true});
+
+// ── Pull-to-refresh ───────────────────────────────────────────────────
+let ptY0 = 0, pulling = false;
+document.addEventListener('touchstart', e => {
+  const pg = document.querySelector('.page.active');
+  if (pg && pg.scrollTop === 0) { ptY0 = e.touches[0].clientY; pulling = true; }
+}, {passive: true});
+document.addEventListener('touchend', e => {
+  if (pulling && e.changedTouches[0].clientY - ptY0 > 60) loadData(true);
+  pulling = false;
+}, {passive: true});
+
+// ── Bottom sheet ──────────────────────────────────────────────────────
+function openSheet(html, title) {
+  const overlay = $('sheet-overlay');
+  const sheet   = $('bottom-sheet');
+  sheet.innerHTML = `
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">${title}</div>
+    ${html}
+  `;
+  overlay.classList.add('show');
+  requestAnimationFrame(() => sheet.classList.add('open'));
+}
+function closeSheet() {
+  $('sheet-overlay').classList.remove('show');
+  $('bottom-sheet').classList.remove('open');
+}
+document.getElementById('sheet-overlay').addEventListener('click', closeSheet);
+
+// ── Helpers ───────────────────────────────────────────────────────────
+function fmt_inr(v) {
+  if (v == null || isNaN(v)) return '—';
+  const n = parseFloat(v);
+  if (Math.abs(n) >= 1e7)  return '₹' + (n/1e7).toFixed(2) + 'Cr';
+  if (Math.abs(n) >= 1e5)  return '₹' + (n/1e5).toFixed(2) + 'L';
+  return '₹' + n.toLocaleString('en-IN', {maximumFractionDigits: 2});
+}
+function fmt_num(v, dec=2) {
+  if (v == null || isNaN(v)) return '—';
+  return parseFloat(v).toFixed(dec);
+}
+function fmt_pct(v, dec=2) {
+  if (v == null || isNaN(v)) return '—';
+  const n = parseFloat(v);
+  const cls = n > 0 ? 'up' : n < 0 ? 'down' : 'neu';
+  const sign = n > 0 ? '+' : '';
+  return `<span class="${cls}">${sign}${n.toFixed(dec)}%</span>`;
+}
+function fmt_oi(v) {
+  if (v == null) return '—';
+  const n = parseInt(v);
+  if (n >= 1e7) return (n/1e7).toFixed(2) + 'Cr';
+  if (n >= 1e5) return (n/1e5).toFixed(2) + 'L';
+  if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
+  return n.toString();
+}
+function fmt_time(d) {
+  return d.toTimeString().slice(0,5);
+}
+function sig_badge(s) {
+  if (!s) return '';
+  const map = {LB:'lb',SB:'sb',LU:'lu',SC:'sc'};
+  return `<span class="sig sig-${map[s]||''}">${s}</span>`;
+}
+function price_cls(v) { return parseFloat(v) > 0 ? 'up' : parseFloat(v) < 0 ? 'down' : 'neu'; }
+function row_cls(sig) { return sig ? sig.toLowerCase() : ''; }
+function ban_badge(r) {
+  return r?.ban_status === 'ban' ? '<span class="ban-badge">BAN</span>' : '';
+}
+window.fmt_inr   = fmt_inr;
+window.fmt_num   = fmt_num;
+window.fmt_pct   = fmt_pct;
+window.fmt_oi    = fmt_oi;
+window.sig_badge = sig_badge;
+window.price_cls = price_cls;
+window.row_cls   = row_cls;
+window.ban_badge = ban_badge;
+window.openSheet = openSheet;
+window.closeSheet= closeSheet;
+
+// ── Sort table helper ─────────────────────────────────────────────────
+function makeSortable(tableId) {
+  const tbl = document.getElementById(tableId);
+  if (!tbl) return;
+  let sortCol = -1, sortAsc = true;
+  tbl.querySelectorAll('th').forEach((th, i) => {
+    th.addEventListener('click', () => {
+      const tbody = tbl.querySelector('tbody');
+      const rows  = Array.from(tbody.querySelectorAll('tr'));
+      if (sortCol === i) sortAsc = !sortAsc; else { sortCol = i; sortAsc = true; }
+      rows.sort((a, b) => {
+        const av = a.cells[i]?.innerText.replace(/[₹%+,]/g,'').trim() || '';
+        const bv = b.cells[i]?.innerText.replace(/[₹%+,]/g,'').trim() || '';
+        const an = parseFloat(av), bn = parseFloat(bv);
+        if (!isNaN(an) && !isNaN(bn)) return sortAsc ? an-bn : bn-an;
+        return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+      });
+      rows.forEach(r => tbody.appendChild(r));
+      tbl.querySelectorAll('th').forEach((h,j) => {
+        h.textContent = h.textContent.replace(' ↑','').replace(' ↓','');
+        if (j === i) h.textContent += sortAsc ? ' ↑' : ' ↓';
+      });
+    });
+  });
+}
+window.makeSortable = makeSortable;
+
+// ── UI helpers ────────────────────────────────────────────────────────
+function setOfflineBanner(on, date) {
+  const b = $('offline-banner');
+  if (on) {
+    b.textContent = '⚠ Offline — showing cached data' + (date ? ' as of ' + date : '');
+    b.classList.add('show');
+    $('content').classList.add('has-banner');
+  } else {
+    b.classList.remove('show');
+    $('content').classList.remove('has-banner');
+  }
+}
+function updateTimestamp() {
+  const meta = FO.data?.meta;
+  if (meta) {
+    $('data-ts').textContent = (meta.date_fmt || meta.date || '') +
+      ' · ' + (FO.lastFetch ? fmt_time(FO.lastFetch) : '');
+  }
+}
+function showPTR(on) {
+  const s = $('ptr-spinner');
+  if (s) s.classList.toggle('show', on);
+}
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+function showError() {
+  ['page-pulse','page-futures','page-oi','page-rollover','page-basis'].forEach(id => {
+    const p = $(id);
+    if (p && !p.querySelector('.error-state')) {
+      p.innerHTML = `
+        <div class="error-state">
+          <div class="err-icon">⚠</div>
+          <div>Could not load data</div>
+          <button class="retry-btn" onclick="loadData(true)">Retry</button>
+        </div>`;
+    }
+  });
+}
+
+// ── Theme toggle ──────────────────────────────────────────────────────
+function toggleTheme() {
+  document.body.classList.toggle('light');
+  $('theme-btn').textContent = document.body.classList.contains('light') ? '🌙' : '☀️';
+  localStorage.setItem('fo-theme', document.body.classList.contains('light') ? 'light' : 'dark');
+}
+if (localStorage.getItem('fo-theme') === 'light') {
+  document.body.classList.add('light');
+  const tb = $('theme-btn');
+  if (tb) tb.textContent = '🌙';
+}
+
+// ── Auto-refresh ──────────────────────────────────────────────────────
+setInterval(() => loadData(), REFRESH_MS);
+
+// ── Boot ──────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  switchTab('pulse');
+  loadData();
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   pulse.js — Market Pulse tab
+   ══════════════════════════════════════════════════════════════════════ */
+
+function renderPulse(data) {
+  const pg = document.getElementById('page-pulse');
+  if (!data || !pg) return;
+
+  const meta = data.meta || {};
+  const near = data.near_month || [];
+  const sb   = data.signal_breakdown || {};
+  const ban  = data.ban_list || {};
+
+  // ── Compute summary stats ─────────────────────────────────────────
+  let advances = 0, declines = 0, unchanged = 0;
+  let totalOI  = 0;
+  near.forEach(r => {
+    const pc = parseFloat(r.price_chg || 0);
+    if (pc > 0) advances++; else if (pc < 0) declines++; else unchanged++;
+    totalOI += parseInt(r.oi || 0);
+  });
+
+  const lbCount = (sb.LB || []).length;
+  const sbCount = (sb.SB || []).length;
+  const luCount = (sb.LU || []).length;
+  const scCount = (sb.SC || []).length;
+
+  // ── Top gainers/losers by price ───────────────────────────────────
+  const sorted = [...near].sort((a,b) => parseFloat(b.price_chg||0) - parseFloat(a.price_chg||0));
+  const gainers5 = sorted.slice(0,5);
+  const losers5  = sorted.slice(-5).reverse();
+
+  // ── Build HTML ────────────────────────────────────────────────────
+  pg.innerHTML = `
+    <div id="ptr-spinner" class="neu" style="text-align:center;padding:6px">↻</div>
+
+    <!-- Summary cards -->
+    <div class="summary-row">
+      <div class="summary-card">
+        <div class="lbl">Total Symbols</div>
+        <div class="val">${near.length}</div>
+        <div class="chg neu">F&O Universe</div>
+      </div>
+      <div class="summary-card">
+        <div class="lbl">Advances / Declines</div>
+        <div class="val"><span class="up">${advances}</span> / <span class="down">${declines}</span></div>
+        <div class="chg neu">Unchanged: ${unchanged}</div>
+      </div>
+      <div class="summary-card">
+        <div class="lbl">Total OI</div>
+        <div class="val">${fmt_oi(totalOI)}</div>
+        <div class="chg neu">Near Month</div>
+      </div>
+      <div class="summary-card">
+        <div class="lbl">Ban List</div>
+        <div class="val down">${(ban.current||[]).length}</div>
+        <div class="chg neu">${(ban.current||[]).join(', ') || 'None'}</div>
+      </div>
+    </div>
+
+    <!-- Signal breakdown -->
+    <div class="sec-head">Signal Breakdown</div>
+    <div class="summary-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="summary-card" style="border-color:#064e1a">
+        <div class="lbl">Long Buildup</div>
+        <div class="val up bold">${lbCount}</div>
+        <div class="chg" style="font-size:9px;color:var(--fg2)">Price↑ OI↑</div>
+      </div>
+      <div class="summary-card" style="border-color:#4e0606">
+        <div class="lbl">Short Buildup</div>
+        <div class="val down bold">${sbCount}</div>
+        <div class="chg" style="font-size:9px;color:var(--fg2)">Price↓ OI↑</div>
+      </div>
+      <div class="summary-card" style="border-color:#4e3006">
+        <div class="lbl">Long Unwinding</div>
+        <div class="val bold" style="color:var(--amber)">${luCount}</div>
+        <div class="chg" style="font-size:9px;color:var(--fg2)">Price↓ OI↓</div>
+      </div>
+      <div class="summary-card" style="border-color:#2e0650">
+        <div class="lbl">Short Covering</div>
+        <div class="val bold" style="color:var(--purple)">${scCount}</div>
+        <div class="chg" style="font-size:9px;color:var(--fg2)">Price↑ OI↓</div>
+      </div>
+    </div>
+
+    <!-- Top gainers -->
+    <div class="sec-head">Top 5 Gainers</div>
+    <div class="tbl-wrap">
+      <table id="tbl-gainers">
+        <thead><tr>
+          <th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI Chg</th><th>Signal</th>
+        </tr></thead>
+        <tbody>
+          ${gainers5.map(r => `
+            <tr class="${row_cls(r.signal)}" onclick="showSymbolSheet(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+              <td>${ban_badge(r)}${r.symbol}</td>
+              <td class="bold">₹${parseFloat(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</td>
+              <td>${fmt_pct(r.price_chg)}</td>
+              <td>${fmt_pct(r.oi_chg ? r.oi_chg/(r.oi-r.oi_chg||1)*100 : 0, 1)}</td>
+              <td>${sig_badge(r.signal)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Top losers -->
+    <div class="sec-head">Top 5 Losers</div>
+    <div class="tbl-wrap">
+      <table id="tbl-losers">
+        <thead><tr>
+          <th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI Chg</th><th>Signal</th>
+        </tr></thead>
+        <tbody>
+          ${losers5.map(r => `
+            <tr class="${row_cls(r.signal)}" onclick="showSymbolSheet(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+              <td>${ban_badge(r)}${r.symbol}</td>
+              <td class="bold">₹${parseFloat(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</td>
+              <td>${fmt_pct(r.price_chg)}</td>
+              <td>${fmt_pct(r.oi_chg ? r.oi_chg/(r.oi-r.oi_chg||1)*100 : 0, 1)}</td>
+              <td>${sig_badge(r.signal)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Heatmap -->
+    <div class="sec-head">
+      Heat Map
+      <select id="hm-filter" style="margin-left:auto;font-size:11px;
+        background:var(--panel);border:1px solid var(--border);
+        color:var(--fg);border-radius:4px;padding:2px 6px">
+        <option value="rank50">Top 50 by Score</option>
+        <option value="all">All Symbols</option>
+        <option value="g25l25">Top 25 Gain + 25 Loss</option>
+      </select>
+    </div>
+    <div id="heatmap-grid"></div>
+  `;
+
+  renderHeatmap(near);
+  document.getElementById('hm-filter').addEventListener('change', e => {
+    renderHeatmap(near, e.target.value);
+  });
+}
+
+// ── Heatmap renderer ──────────────────────────────────────────────────
+function renderHeatmap(rows, mode = 'rank50') {
+  const grid = document.getElementById('heatmap-grid');
+  if (!grid) return;
+
+  // Score = price_chg*0.5 + oi_chg_pct*0.5
+  function score(r) {
+    const pc  = parseFloat(r.price_chg || 0);
+    const oi  = parseInt(r.oi || 0);
+    const oic = parseInt(r.oi_chg || 0);
+    const ocp = oi > 0 && (oi-oic) > 0 ? oic/(oi-oic)*100 : 0;
+    return pc*0.5 + ocp*0.5;
+  }
+  function oiChgPct(r) {
+    const oi = parseInt(r.oi||0), oic = parseInt(r.oi_chg||0);
+    return oi>0&&(oi-oic)>0 ? (oic/(oi-oic)*100).toFixed(1) : '0.0';
+  }
+
+  let heat;
+  const scored = rows.map(r => ({...r, _score: score(r)}))
+                     .sort((a,b) => b._score - a._score);
+
+  if (mode === 'all') {
+    heat = scored;
+  } else if (mode === 'g25l25') {
+    const byPrice = [...rows].sort((a,b) =>
+      parseFloat(b.price_chg||0) - parseFloat(a.price_chg||0));
+    heat = [...byPrice.slice(0,25), ...byPrice.slice(-25).reverse()];
+  } else {
+    heat = scored.slice(0, 50);
+  }
+
+  function tileStyle(sc, pc) {
+    const a = Math.abs(sc);
+    if (a < 1.0)  return { bg: '#1a1f2e', fg: pc>=0 ? '#22c55e' : '#ef4444', brd: '#2a3040' };
+    if (sc >= 5)  return { bg: '#004d00', fg: '#ffffff', brd: '#006600' };
+    if (sc >= 3)  return { bg: '#006600', fg: '#ffffff', brd: '#008800' };
+    if (sc >= 1)  return { bg: '#1a8c1a', fg: '#ffffff', brd: '#22aa22' };
+    if (sc >= -3) return { bg: '#991a1a', fg: '#ffffff', brd: '#bb2222' };
+    if (sc >= -5) return { bg: '#cc0000', fg: '#ffffff', brd: '#dd1111' };
+    return { bg: '#800000', fg: '#ffffff', brd: '#990000' };
+  }
+
+  const SIG_COLS = {LB:'#00e676',SB:'#ff5252',LU:'#ffab40',SC:'#ce93d8'};
+
+  grid.innerHTML = heat.map((r, idx) => {
+    const sc  = r._score || score(r);
+    const pc  = parseFloat(r.price_chg || 0);
+    const ocp = oiChgPct(r);
+    const ltp = parseFloat(r.ltp || 0);
+    const {bg, fg, brd} = tileStyle(sc, pc);
+    const isTop = idx < 10;
+    const rankBadge = isTop
+      ? `<div style="position:absolute;top:3px;left:3px;background:#1a7abf;
+           color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px">#${idx+1}</div>`
+      : '';
+    const sigCol = SIG_COLS[r.signal] || '';
+    const sigBdg = r.signal && sigCol
+      ? `<div style="position:absolute;bottom:4px;left:4px;background:${sigCol};
+           color:#000;font-size:${isTop?'9':'8'}px;font-weight:700;
+           padding:1px ${isTop?'6':'4'}px;border-radius:3px">${r.signal}</div>`
+      : '';
+    const height = isTop ? '110px' : '52px';
+    const ltpSize = isTop ? '15px' : '11px';
+    const pctSize = isTop ? '11px' : '9px';
+
+    return `
+      <div class="hm-tile" style="background:${bg};border:1px solid ${brd};
+        min-height:${height};position:relative;color:${fg}"
+        onclick='showSymbolSheet(${JSON.stringify(r)})'>
+        ${rankBadge}
+        <div class="hm-sym" style="color:${fg}">${r.symbol}</div>
+        <div class="hm-ltp" style="font-size:${ltpSize};color:${fg}">
+          ₹${ltp >= 10000 ? ltp.toFixed(0) : ltp.toFixed(1)}
+        </div>
+        <div class="hm-pct" style="font-size:${pctSize};color:${fg}">
+          ${pc >= 0 ? '+' : ''}${pc.toFixed(2)}%
+        </div>
+        <div class="hm-oi" style="color:${parseFloat(ocp)>=0?'#00e676':'#ff5252'}">
+          OI ${parseFloat(ocp)>=0?'+':''}${ocp}%
+        </div>
+        ${sigBdg}
+      </div>`;
+  }).join('');
+}
+
+// ── Symbol detail sheet ───────────────────────────────────────────────
+function showSymbolSheet(r) {
+  if (typeof r === 'string') try { r = JSON.parse(r); } catch { return; }
+  const pc   = parseFloat(r.price_chg || 0);
+  const oi   = parseInt(r.oi || 0);
+  const oic  = parseInt(r.oi_chg || 0);
+  const oicp = oi>0&&(oi-oic)>0 ? ((oic/(oi-oic))*100).toFixed(2) : '0.00';
+
+  openSheet(`
+    <div class="sheet-row"><span class="lbl">LTP</span>
+      <span class="val bold">₹${parseFloat(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
+    <div class="sheet-row"><span class="lbl">Spot</span>
+      <span class="val">₹${parseFloat(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
+    <div class="sheet-row"><span class="lbl">Price Chg</span>
+      <span class="val ${pc>=0?'up':'down'}">${pc>=0?'+':''}${pc.toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Open Interest</span>
+      <span class="val">${fmt_oi(r.oi)}</span></div>
+    <div class="sheet-row"><span class="lbl">OI Change</span>
+      <span class="val ${parseFloat(oicp)>=0?'up':'down'}">${parseFloat(oicp)>=0?'+':''}${oicp}%</span></div>
+    <div class="sheet-row"><span class="lbl">Basis</span>
+      <span class="val">${parseFloat(r.basis||0).toFixed(2)} (${parseFloat(r.basis_pct||0).toFixed(2)}%)</span></div>
+    <div class="sheet-row"><span class="lbl">Fair Value</span>
+      <span class="val">₹${parseFloat(r.fair_value||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">Conv. Score</span>
+      <span class="val">${parseFloat(r.conv_score||0).toFixed(1)}</span></div>
+    <div class="sheet-row"><span class="lbl">Signal</span>
+      <span class="val">${sig_badge(r.signal)}</span></div>
+    <div class="sheet-row"><span class="lbl">Pattern</span>
+      <span class="val">${r.pattern||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Days to Exp</span>
+      <span class="val">${r.days_to_exp||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Expiry</span>
+      <span class="val">${r.expiry||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Lot Size</span>
+      <span class="val">${r.lot||'—'}</span></div>
+    ${r.alerts ? `<div class="sheet-row"><span class="lbl">Alerts</span>
+      <span class="val" style="font-size:11px">${r.alerts}</span></div>` : ''}
+  `, (r.ban_status==='ban'?'🚫 ':'')+r.symbol);
+}
+window.showSymbolSheet = showSymbolSheet;
+window.renderPulse     = renderPulse;
+
+/* ══════════════════════════════════════════════════════════════════════
+   futures.js — Futures Tracker tab
+   ══════════════════════════════════════════════════════════════════════ */
+
+let _futData = [], _futFiltered = [];
+
+function renderFutures(data) {
+  const pg = document.getElementById('page-futures');
+  if (!data || !pg) return;
+
+  _futData = data.near_month || [];
+
+  pg.innerHTML = `
+    <div class="filter-bar">
+      <input id="fut-search" type="search" placeholder="Search symbol…">
+      <select id="fut-signal">
+        <option value="">All Signals</option>
+        <option value="LB">Long Buildup</option>
+        <option value="SB">Short Buildup</option>
+        <option value="LU">Long Unwinding</option>
+        <option value="SC">Short Covering</option>
+      </select>
+      <select id="fut-sort">
+        <option value="oi_desc">OI ↓</option>
+        <option value="price_desc">Chg% ↓</option>
+        <option value="price_asc">Chg% ↑</option>
+        <option value="basis_desc">Basis% ↓</option>
+        <option value="conv_desc">Conv ↓</option>
+      </select>
+    </div>
+    <div id="fut-count" style="font-size:11px;color:var(--fg2);margin-bottom:6px"></div>
+    <div class="tbl-wrap">
+      <table id="tbl-futures">
+        <thead><tr>
+          <th>Symbol</th>
+          <th>LTP</th>
+          <th>Chg%</th>
+          <th>OI</th>
+          <th>OI Chg</th>
+          <th>Basis%</th>
+          <th>Conv</th>
+          <th>Sig</th>
+        </tr></thead>
+        <tbody id="fut-tbody"></tbody>
+      </table>
+    </div>
+  `;
+
+  const search = document.getElementById('fut-search');
+  const signal = document.getElementById('fut-signal');
+  const sort   = document.getElementById('fut-sort');
+
+  function applyFilters() {
+    const q  = search.value.trim().toUpperCase();
+    const sg = signal.value;
+    const so = sort.value;
+
+    let rows = _futData.filter(r =>
+      (!q  || r.symbol.includes(q)) &&
+      (!sg || r.signal === sg)
+    );
+
+    rows.sort((a,b) => {
+      switch(so) {
+        case 'price_desc': return parseFloat(b.price_chg||0) - parseFloat(a.price_chg||0);
+        case 'price_asc':  return parseFloat(a.price_chg||0) - parseFloat(b.price_chg||0);
+        case 'basis_desc': return parseFloat(b.basis_pct||0) - parseFloat(a.basis_pct||0);
+        case 'conv_desc':  return parseFloat(b.conv_score||0) - parseFloat(a.conv_score||0);
+        default:           return parseInt(b.oi||0) - parseInt(a.oi||0);
+      }
+    });
+    _futFiltered = rows;
+    renderFutureRows(rows);
+  }
+
+  search.addEventListener('input',  applyFilters);
+  signal.addEventListener('change', applyFilters);
+  sort.addEventListener('change',   applyFilters);
+  applyFilters();
+}
+
+function renderFutureRows(rows) {
+  const tbody = document.getElementById('fut-tbody');
+  const count = document.getElementById('fut-count');
+  if (!tbody) return;
+  count.textContent = `${rows.length} symbols`;
+
+  tbody.innerHTML = rows.map(r => {
+    const pc  = parseFloat(r.price_chg || 0);
+    const oi  = parseInt(r.oi || 0);
+    const oic = parseInt(r.oi_chg || 0);
+    const oicp = oi>0&&(oi-oic)>0 ? ((oic/(oi-oic))*100).toFixed(1) : '0.0';
+    const ltp  = parseFloat(r.ltp || 0);
+    return `
+      <tr class="${row_cls(r.signal)}" onclick='showFutureSheet(${JSON.stringify(r)})'>
+        <td>${ban_badge(r)}<strong>${r.symbol}</strong></td>
+        <td class="bold">₹${ltp>=10000?ltp.toFixed(0):ltp.toFixed(2)}</td>
+        <td class="${pc>=0?'up':'down'} bold">${pc>=0?'+':''}${pc.toFixed(2)}%</td>
+        <td>${fmt_oi(r.oi)}</td>
+        <td class="${parseFloat(oicp)>=0?'up':'down'}">${parseFloat(oicp)>=0?'+':''}${oicp}%</td>
+        <td class="${parseFloat(r.basis_pct||0)>=0?'up':'down'}">${parseFloat(r.basis_pct||0).toFixed(2)}%</td>
+        <td>${parseFloat(r.conv_score||0).toFixed(1)}</td>
+        <td>${sig_badge(r.signal)}</td>
+      </tr>`;
+  }).join('');
+}
+
+function showFutureSheet(r) {
+  if (typeof r === 'string') try { r = JSON.parse(r); } catch { return; }
+  const pc   = parseFloat(r.price_chg || 0);
+  const oi   = parseInt(r.oi || 0);
+  const oic  = parseInt(r.oi_chg || 0);
+  const oicp = oi>0&&(oi-oic)>0 ? ((oic/(oi-oic))*100).toFixed(2) : '0.00';
+
+  // Mini OI sparkline (last 6 days)
+  const hist = r.oi_history || [];
+  let spark = '';
+  if (hist.length > 1) {
+    const max = Math.max(...hist), min = Math.min(...hist);
+    const range = max - min || 1;
+    const pts = hist.map((v,i) => {
+      const x = (i / (hist.length-1)) * 80;
+      const y = 20 - ((v-min)/range)*18;
+      return `${x},${y}`;
+    }).join(' ');
+    const lastUp = hist[hist.length-1] >= hist[hist.length-2];
+    spark = `<div style="margin:8px 0 4px">
+      <div style="font-size:10px;color:var(--fg2);margin-bottom:4px">OI Trend (6d)</div>
+      <svg width="80" height="22" style="display:block">
+        <polyline points="${pts}" fill="none"
+          stroke="${lastUp?'#22c55e':'#ef4444'}" stroke-width="1.5"/>
+      </svg>
+    </div>`;
+  }
+
+  openSheet(`
+    ${spark}
+    <div class="sheet-row"><span class="lbl">LTP</span>
+      <span class="val bold">₹${parseFloat(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
+    <div class="sheet-row"><span class="lbl">Spot</span>
+      <span class="val">₹${parseFloat(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
+    <div class="sheet-row"><span class="lbl">Price Change</span>
+      <span class="val ${pc>=0?'up':'down'} bold">${pc>=0?'+':''}${pc.toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Open Interest</span>
+      <span class="val">${fmt_oi(r.oi)} lots</span></div>
+    <div class="sheet-row"><span class="lbl">OI Change</span>
+      <span class="val ${parseFloat(oicp)>=0?'up':'down'}">${parseFloat(oicp)>=0?'+':''}${oicp}%</span></div>
+    <div class="sheet-row"><span class="lbl">Basis</span>
+      <span class="val">₹${parseFloat(r.basis||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">Basis%</span>
+      <span class="val ${parseFloat(r.basis_pct||0)>=0?'up':'down'}">${parseFloat(r.basis_pct||0).toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Fair Value</span>
+      <span class="val">₹${parseFloat(r.fair_value||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">FV Diff</span>
+      <span class="val">${parseFloat(r.fv_diff||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">Conv. Score</span>
+      <span class="val">${parseFloat(r.conv_score||0).toFixed(1)}</span></div>
+    <div class="sheet-row"><span class="lbl">Signal</span>
+      <span class="val">${sig_badge(r.signal)}</span></div>
+    <div class="sheet-row"><span class="lbl">Pattern</span>
+      <span class="val">${r.pattern||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">5d Price Chg%</span>
+      <span class="val">${parseFloat(r.price_5d_pct||0).toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">5d OI Chg%</span>
+      <span class="val">${parseFloat(r.oi_5d_pct||0).toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Days to Expiry</span>
+      <span class="val">${r.days_to_exp||'—'} (${r.expiry||''})</span></div>
+    <div class="sheet-row"><span class="lbl">Lot Size</span>
+      <span class="val">${r.lot||'—'}</span></div>
+    ${r.alerts ? `<div class="sheet-row"><span class="lbl">Alerts</span>
+      <span class="val">${r.alerts}</span></div>` : ''}
+  `, (r.ban_status==='ban'?'🚫 ':'')+r.symbol+' — Futures');
+}
+window.showFutureSheet = showFutureSheet;
+window.renderFutures   = renderFutures;
+
+/* ══════════════════════════════════════════════════════════════════════
+   oi.js — OI Analysis tab
+   ══════════════════════════════════════════════════════════════════════ */
+
+let _oiScreen = 'movers'; // 'movers' | 'signals'
+
+function renderOI(data) {
+  const pg = document.getElementById('page-oi');
+  if (!data || !pg) return;
+
+  const gainers = (data.oi_movers?.gainers || []).slice(0, 25);
+  const losers  = (data.oi_movers?.losers  || []).slice(0, 25);
+  const sb      = data.signal_breakdown || {};
+
+  pg.innerHTML = `
+    <!-- Screen toggle -->
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <button id="oi-btn-movers" onclick="oiSwitch('movers')"
+        style="flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;
+          font-size:12px;font-weight:700;background:var(--accent);color:#fff">
+        📊 OI Movers
+      </button>
+      <button id="oi-btn-signals" onclick="oiSwitch('signals')"
+        style="flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;
+          font-size:12px;font-weight:700;background:var(--panel);color:var(--fg2)">
+        🏷 Signal Breakdown
+      </button>
+    </div>
+
+    <!-- Screen 1: Movers -->
+    <div id="oi-screen-movers">
+      <div class="sec-head">🔥 Top 25 OI Gainers</div>
+      <div class="tbl-wrap">
+        <table id="tbl-gainers">
+          <thead><tr>
+            <th>Symbol</th><th>LTP</th><th>Chg%</th>
+            <th>OI</th><th>OI Chg%</th><th>Sig</th>
+          </tr></thead>
+          <tbody>
+            ${gainers.map(r => oiRow(r)).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sec-head" style="margin-top:14px">❄️ Top 25 OI Losers</div>
+      <div class="tbl-wrap">
+        <table id="tbl-losers">
+          <thead><tr>
+            <th>Symbol</th><th>LTP</th><th>Chg%</th>
+            <th>OI</th><th>OI Chg%</th><th>Sig</th>
+          </tr></thead>
+          <tbody>
+            ${losers.map(r => oiRow(r)).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Screen 2: Signal Breakdown -->
+    <div id="oi-screen-signals" style="display:none">
+      ${['LB','SB','LU','SC'].map(code => {
+        const items = (sb[code] || []).slice(0, 10);
+        const colors = {LB:'#22c55e',SB:'#ef4444',LU:'#f59e0b',SC:'#a855f7'};
+        const names  = {LB:'Long Buildup',SB:'Short Buildup',LU:'Long Unwinding',SC:'Short Covering'};
+        const descs  = {LB:'Price↑ OI↑',SB:'Price↓ OI↑',LU:'Price↓ OI↓',SC:'Price↑ OI↓'};
+        return `
+          <div class="card" style="border-color:${colors[code]}22;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <span class="sig sig-${code.toLowerCase()}" style="font-size:13px;padding:3px 8px">${code}</span>
+              <span style="font-size:13px;font-weight:700;color:${colors[code]}">${names[code]}</span>
+              <span style="margin-left:auto;font-size:20px;font-weight:700;color:${colors[code]}">${items.length}</span>
+            </div>
+            <div style="font-size:10px;color:var(--fg2);margin-bottom:8px">${descs[code]}</div>
+            ${items.length ? `
+            <div class="tbl-wrap">
+              <table>
+                <thead><tr>
+                  <th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI</th><th>OI Chg%</th>
+                </tr></thead>
+                <tbody>
+                  ${items.map(r => oiRow(r, true)).join('')}
+                </tbody>
+              </table>
+            </div>` : '<div style="color:var(--fg2);font-size:12px;padding:6px">No signals</div>'}
+          </div>`;
+      }).join('')}
+    </div>
+  `;
+
+  oiSwitch(_oiScreen);
+}
+
+function oiRow(r, compact = false) {
+  const pc  = parseFloat(r.price_chg || 0);
+  const oi  = parseInt(r.oi || 0);
+  const oic = parseInt(r.oi_chg || 0);
+  const oicp = oi>0&&(oi-oic)>0 ? ((oic/(oi-oic))*100).toFixed(1) : '0.0';
+  const ltp  = parseFloat(r.ltp || 0);
+  return `
+    <tr class="${row_cls(r.signal)}" onclick='showSymbolSheet(${JSON.stringify(r)})'>
+      <td>${ban_badge(r)}<strong>${r.symbol}</strong></td>
+      <td>₹${ltp>=10000?ltp.toFixed(0):ltp.toFixed(2)}</td>
+      <td class="${pc>=0?'up':'down'}">${pc>=0?'+':''}${pc.toFixed(2)}%</td>
+      <td>${fmt_oi(r.oi)}</td>
+      <td class="${parseFloat(oicp)>=0?'up':'down'}">${parseFloat(oicp)>=0?'+':''}${oicp}%</td>
+      ${compact ? '' : `<td>${sig_badge(r.signal)}</td>`}
+    </tr>`;
+}
+
+function oiSwitch(screen) {
+  _oiScreen = screen;
+  const m  = document.getElementById('oi-screen-movers');
+  const s  = document.getElementById('oi-screen-signals');
+  const bm = document.getElementById('oi-btn-movers');
+  const bs = document.getElementById('oi-btn-signals');
+  if (!m || !s) return;
+  if (screen === 'movers') {
+    m.style.display = 'block'; s.style.display = 'none';
+    if (bm) { bm.style.background='var(--accent)'; bm.style.color='#fff'; }
+    if (bs) { bs.style.background='var(--panel)';  bs.style.color='var(--fg2)'; }
+  } else {
+    m.style.display = 'none'; s.style.display = 'block';
+    if (bs) { bs.style.background='var(--accent)'; bs.style.color='#fff'; }
+    if (bm) { bm.style.background='var(--panel)';  bm.style.color='var(--fg2)'; }
+  }
+}
+
+window.oiSwitch  = oiSwitch;
+window.renderOI  = renderOI;
+
+/* ══════════════════════════════════════════════════════════════════════
+   rollover.js — Rollover tab
+   ══════════════════════════════════════════════════════════════════════ */
+
+function renderRollover(data) {
+  const pg = document.getElementById('page-rollover');
+  if (!data || !pg) return;
+
+  const rows = data.rollover || [];
+  if (!rows.length) {
+    pg.innerHTML = '<div class="error-state"><div class="err-icon">📭</div><div>No rollover data available</div></div>';
+    return;
+  }
+
+  // Market-wide rollover%
+  const totalNear = rows.reduce((s,r) => s + parseInt(r.oi_near||0), 0);
+  const totalNext = rows.reduce((s,r) => s + parseInt(r.oi_next||0), 0);
+  const mktRoll   = totalNear+totalNext > 0
+    ? (totalNext/(totalNear+totalNext)*100).toFixed(1) : '—';
+
+  pg.innerHTML = `
+    <!-- Market rollover gauge -->
+    <div class="card" style="text-align:center;margin-bottom:12px">
+      <div class="card-title">Market Rollover %</div>
+      <div style="font-size:48px;font-weight:700;color:var(--accent);line-height:1">${mktRoll}%</div>
+      <div style="font-size:11px;color:var(--fg2);margin-top:4px">
+        Near OI: ${fmt_oi(totalNear)} · Next OI: ${fmt_oi(totalNext)}
+      </div>
+      <!-- Arc gauge using CSS -->
+      <div style="margin:12px auto;width:160px;height:80px;position:relative;overflow:hidden">
+        <div style="position:absolute;bottom:0;left:0;width:160px;height:160px;
+          border-radius:50%;border:12px solid var(--border);clip-path:inset(0 0 50% 0)"></div>
+        <div style="position:absolute;bottom:0;left:0;width:160px;height:160px;
+          border-radius:50%;border:12px solid var(--accent);clip-path:inset(0 0 50% 0);
+          transform:rotate(${mktRoll*1.8-180}deg);transform-origin:50% 100%;
+          transition:transform 0.5s ease"></div>
+        <div style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);
+          font-size:11px;color:var(--fg2)">${mktRoll}%</div>
+      </div>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <input id="ro-search" type="search" placeholder="Search symbol…">
+      <select id="ro-bias">
+        <option value="">All Signals</option>
+        <option value="LB">Long Buildup</option>
+        <option value="SB">Short Buildup</option>
+        <option value="LU">Long Unwinding</option>
+        <option value="SC">Short Covering</option>
+      </select>
+      <select id="ro-sort">
+        <option value="roll_desc">Roll% ↓</option>
+        <option value="roll_asc">Roll% ↑</option>
+        <option value="oi_desc">OI ↓</option>
+      </select>
+    </div>
+
+    <div class="tbl-wrap">
+      <table id="tbl-rollover">
+        <thead><tr>
+          <th>Symbol</th>
+          <th>Roll%</th>
+          <th>Near OI</th>
+          <th>Next OI</th>
+          <th>CoC%</th>
+          <th>Sig</th>
+        </tr></thead>
+        <tbody id="ro-tbody"></tbody>
+      </table>
+    </div>
+  `;
+
+  const search = document.getElementById('ro-search');
+  const bias   = document.getElementById('ro-bias');
+  const sort   = document.getElementById('ro-sort');
+
+  function apply() {
+    const q  = search.value.trim().toUpperCase();
+    const sg = bias.value;
+    const so = sort.value;
+    let list = rows.filter(r =>
+      (!q  || (r.symbol||'').includes(q)) &&
+      (!sg || r.near_signal === sg)
+    );
+    list.sort((a,b) => {
+      switch(so) {
+        case 'roll_asc':  return parseFloat(a.rollover_pct||0) - parseFloat(b.rollover_pct||0);
+        case 'oi_desc':   return parseInt(b.oi_near||0) - parseInt(a.oi_near||0);
+        default:          return parseFloat(b.rollover_pct||0) - parseFloat(a.rollover_pct||0);
+      }
+    });
+    renderRolloverRows(list);
+  }
+
+  search.addEventListener('input',  apply);
+  bias.addEventListener('change',   apply);
+  sort.addEventListener('change',   apply);
+  apply();
+}
+
+function renderRolloverRows(rows) {
+  const tbody = document.getElementById('ro-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = rows.map(r => {
+    const rp  = parseFloat(r.rollover_pct || 0);
+    const coc = parseFloat(r.cost_of_carry || 0);
+    const fillW = Math.min(rp, 100).toFixed(1);
+    const fillC = rp >= 70 ? '#22c55e' : rp >= 40 ? '#1a7abf' : '#f59e0b';
+    return `
+      <tr class="${row_cls(r.near_signal)}" onclick='showRolloverSheet(${JSON.stringify(r)})'>
+        <td><strong>${r.symbol}</strong></td>
+        <td>
+          <div style="font-weight:700">${rp.toFixed(1)}%</div>
+          <div class="roll-bar"><div class="roll-fill" style="width:${fillW}%;background:${fillC}"></div></div>
+        </td>
+        <td>${fmt_oi(r.oi_near)}</td>
+        <td>${fmt_oi(r.oi_next)}</td>
+        <td class="${coc>=0?'up':'down'}">${coc>=0?'+':''}${coc.toFixed(2)}%</td>
+        <td>${sig_badge(r.near_signal)}</td>
+      </tr>`;
+  }).join('');
+}
+
+function showRolloverSheet(r) {
+  if (typeof r === 'string') try { r = JSON.parse(r); } catch { return; }
+  const rp = parseFloat(r.rollover_pct || 0);
+  openSheet(`
+    <div class="sheet-row"><span class="lbl">Rollover %</span>
+      <span class="val bold" style="font-size:20px">${rp.toFixed(1)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Near OI</span>
+      <span class="val">${fmt_oi(r.oi_near)} lots</span></div>
+    <div class="sheet-row"><span class="lbl">Next OI</span>
+      <span class="val">${fmt_oi(r.oi_next)} lots</span></div>
+    <div class="sheet-row"><span class="lbl">Near Expiry</span>
+      <span class="val">${r.near_expiry||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Next Expiry</span>
+      <span class="val">${r.next_expiry||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Cost of Carry</span>
+      <span class="val ${parseFloat(r.cost_of_carry||0)>=0?'up':'down'}">${parseFloat(r.cost_of_carry||0).toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Near Signal</span>
+      <span class="val">${sig_badge(r.near_signal)}</span></div>
+    <div class="sheet-row"><span class="lbl">Mid Signal</span>
+      <span class="val">${sig_badge(r.mid_signal)}</span></div>
+  `, r.symbol + ' — Rollover');
+}
+
+window.showRolloverSheet = showRolloverSheet;
+window.renderRollover    = renderRollover;
+
+/* ══════════════════════════════════════════════════════════════════════
+   basis.js — Basis Analysis tab
+   ══════════════════════════════════════════════════════════════════════ */
+
+function renderBasis(data) {
+  const pg = document.getElementById('page-basis');
+  if (!data || !pg) return;
+
+  const rows = data.basis_summary || [];
+
+  // Stats
+  const premium  = rows.filter(r => parseFloat(r.basis_pct||0) >  0.5).length;
+  const discount = rows.filter(r => parseFloat(r.basis_pct||0) < -0.5).length;
+  const parity   = rows.length - premium - discount;
+
+  pg.innerHTML = `
+    <!-- Summary pills -->
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <div class="card" style="flex:1;text-align:center;padding:8px;border-color:#064e1a">
+        <div style="font-size:20px;font-weight:700;color:var(--green)">${premium}</div>
+        <div style="font-size:10px;color:var(--fg2)">Premium</div>
+      </div>
+      <div class="card" style="flex:1;text-align:center;padding:8px">
+        <div style="font-size:20px;font-weight:700;color:var(--fg2)">${parity}</div>
+        <div style="font-size:10px;color:var(--fg2)">Parity</div>
+      </div>
+      <div class="card" style="flex:1;text-align:center;padding:8px;border-color:#4e0606">
+        <div style="font-size:20px;font-weight:700;color:var(--red)">${discount}</div>
+        <div style="font-size:10px;color:var(--fg2)">Discount</div>
+      </div>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <input id="ba-search" type="search" placeholder="Search symbol…">
+      <select id="ba-filter">
+        <option value="">All</option>
+        <option value="premium">Premium only</option>
+        <option value="discount">Discount only</option>
+      </select>
+      <select id="ba-sort">
+        <option value="basis_desc">Basis% ↓</option>
+        <option value="basis_asc">Basis% ↑</option>
+        <option value="conv_desc">Conv ↓</option>
+      </select>
+    </div>
+
+    <div class="tbl-wrap">
+      <table id="tbl-basis">
+        <thead><tr>
+          <th>Symbol</th>
+          <th>Spot</th>
+          <th>Fut LTP</th>
+          <th>Basis%</th>
+          <th>FV</th>
+          <th>FV Diff</th>
+          <th>Conv</th>
+          <th>Sig</th>
+        </tr></thead>
+        <tbody id="ba-tbody"></tbody>
+      </table>
+    </div>
+  `;
+
+  const search = document.getElementById('ba-search');
+  const filter = document.getElementById('ba-filter');
+  const sort   = document.getElementById('ba-sort');
+
+  function apply() {
+    const q  = search.value.trim().toUpperCase();
+    const f  = filter.value;
+    const so = sort.value;
+    let list = rows.filter(r => {
+      if (q && !(r.symbol||'').includes(q)) return false;
+      const bp = parseFloat(r.basis_pct||0);
+      if (f === 'premium'  && bp <= 0.5)  return false;
+      if (f === 'discount' && bp >= -0.5) return false;
+      return true;
+    });
+    list.sort((a,b) => {
+      switch(so) {
+        case 'basis_asc':  return parseFloat(a.basis_pct||0) - parseFloat(b.basis_pct||0);
+        case 'conv_desc':  return parseFloat(b.conv_score||0) - parseFloat(a.conv_score||0);
+        default:           return parseFloat(b.basis_pct||0) - parseFloat(a.basis_pct||0);
+      }
+    });
+    renderBasisRows(list);
+  }
+
+  search.addEventListener('input',  apply);
+  filter.addEventListener('change', apply);
+  sort.addEventListener('change',   apply);
+  apply();
+}
+
+function renderBasisRows(rows) {
+  const tbody = document.getElementById('ba-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = rows.map(r => {
+    const bp   = parseFloat(r.basis_pct || 0);
+    const fvd  = parseFloat(r.fv_diff || 0);
+    const conv = parseFloat(r.conv_score || 0);
+    const sig  = r.signal || '';
+    // Basis colour
+    let bpCls = 'neu';
+    if (bp >  1.0) bpCls = 'up bold';
+    else if (bp < -1.0) bpCls = 'down bold';
+    else if (bp >  0.3) bpCls = 'up';
+    else if (bp < -0.3) bpCls = 'down';
+
+    return `
+      <tr class="${row_cls(sig)}" onclick='showBasisSheet(${JSON.stringify(r)})'>
+        <td><strong>${r.symbol}</strong></td>
+        <td>₹${parseFloat(r.spot||0).toFixed(2)}</td>
+        <td>₹${parseFloat(r.ltp||0).toFixed(2)}</td>
+        <td class="${bpCls}">${bp>=0?'+':''}${bp.toFixed(2)}%</td>
+        <td>₹${parseFloat(r.fair_value||0).toFixed(2)}</td>
+        <td class="${fvd>=0?'up':'down'}">${fvd>=0?'+':''}${fvd.toFixed(2)}</td>
+        <td>${conv.toFixed(1)}</td>
+        <td>${sig_badge(sig)}</td>
+      </tr>`;
+  }).join('');
+}
+
+function showBasisSheet(r) {
+  if (typeof r === 'string') try { r = JSON.parse(r); } catch { return; }
+  const bp  = parseFloat(r.basis_pct || 0);
+  const fvd = parseFloat(r.fv_diff || 0);
+  openSheet(`
+    <div class="sheet-row"><span class="lbl">Spot Price</span>
+      <span class="val bold">₹${parseFloat(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
+    <div class="sheet-row"><span class="lbl">Futures LTP</span>
+      <span class="val bold">₹${parseFloat(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
+    <div class="sheet-row"><span class="lbl">Basis</span>
+      <span class="val">₹${parseFloat(r.basis||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">Basis %</span>
+      <span class="val ${bp>=0?'up':'down'} bold">${bp>=0?'+':''}${bp.toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Fair Value</span>
+      <span class="val">₹${parseFloat(r.fair_value||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">FV Diff</span>
+      <span class="val ${fvd>=0?'up':'down'}">${fvd>=0?'+':''}${fvd.toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">Conv Score</span>
+      <span class="val">${parseFloat(r.conv_score||0).toFixed(1)}</span></div>
+    <div class="sheet-row"><span class="lbl">Signal</span>
+      <span class="val">${sig_badge(r.signal)}</span></div>
+    <div class="sheet-row"><span class="lbl">Pattern</span>
+      <span class="val">${r.pattern||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Days to Expiry</span>
+      <span class="val">${r.days_to_exp||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Expiry</span>
+      <span class="val">${r.expiry||'—'}</span></div>
+  `, r.symbol + ' — Basis');
+}
+
+window.showBasisSheet = showBasisSheet;
+window.renderBasis    = renderBasis;
+
+  </script>
+
+</body>
+</html>
