@@ -437,6 +437,80 @@ tr.sc td { color: #a855f7; }
   margin-right: 3px;
 }
 
+/* ── Strategy card ───────────────────────────────────────────────────── */
+.strat-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.strat-card:active { border-color: var(--accent); }
+.strat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 6px;
+}
+.strat-sym { font-size: 14px; font-weight: 700; }
+.strat-type {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+}
+.strat-bullish  { background: #064e1a; color: #22c55e; }
+.strat-bearish  { background: #4e0606; color: #ef4444; }
+.strat-neutral  { background: #1a2e42; color: #7ca8c8; }
+.strat-row {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--fg2);
+  flex-wrap: wrap;
+}
+.strat-row span { white-space: nowrap; }
+.strat-row strong { color: var(--fg); }
+.strat-conf {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.strat-conf-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s;
+}
+
+/* ── Screener ─────────────────────────────────────────────────────────── */
+.scr-tag {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  background: var(--panel2);
+  color: var(--fg2);
+  margin-right: 3px;
+}
+.scr-hit { background: #064e1a; color: #22c55e; }
+
+/* ── Tabbar overflow scroll (7 tabs) ──────────────────────────────────── */
+#tabbar {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+#tabbar::-webkit-scrollbar { display: none; }
+.tab-btn { min-width: 60px; flex: 0 0 auto; }
+
 /* ── Scrollbar ───────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -483,6 +557,14 @@ tr.sc td { color: #a855f7; }
       <div class="skeleton" style="height:60px;margin-bottom:8px"></div>
       <div class="skeleton" style="height:300px"></div>
     </div>
+    <div id="page-scanner"  class="page">
+      <div class="skeleton" style="height:60px;margin-bottom:8px"></div>
+      <div class="skeleton" style="height:300px"></div>
+    </div>
+    <div id="page-screener" class="page">
+      <div class="skeleton" style="height:60px;margin-bottom:8px"></div>
+      <div class="skeleton" style="height:300px"></div>
+    </div>
   </div>
 
   <div id="sheet-overlay"></div>
@@ -504,6 +586,12 @@ tr.sc td { color: #a855f7; }
     </button>
     <button id="tab-basis"    class="tab-btn" onclick="switchTab('basis')">
       <span class="icon">⚖️</span><span>Basis</span>
+    </button>
+    <button id="tab-scanner"  class="tab-btn" onclick="switchTab('scanner')">
+      <span class="icon">🎯</span><span>Strategy</span>
+    </button>
+    <button id="tab-screener" class="tab-btn" onclick="switchTab('screener')">
+      <span class="icon">🔎</span><span>Screener</span>
     </button>
   </nav>
 
@@ -587,6 +675,8 @@ const TAB_RENDERERS = {
   oi:       () => window.renderOI       && renderOI(FO.data),
   rollover: () => window.renderRollover && renderRollover(FO.data),
   basis:    () => window.renderBasis    && renderBasis(FO.data),
+  scanner:  () => window.renderScanner  && renderScanner(FO.data),
+  screener: () => window.renderScreener && renderScreener(FO.data),
 };
 
 function switchTab(name) {
@@ -607,7 +697,7 @@ function renderCurrentTab() {
 }
 
 // ── Swipe navigation ──────────────────────────────────────────────────
-const TABS = ['pulse','futures','oi','rollover','basis'];
+const TABS = ['pulse','futures','oi','rollover','basis','scanner','screener'];
 let touchX0 = 0;
 document.addEventListener('touchstart', e => { touchX0 = e.touches[0].clientX; }, {passive: true});
 document.addEventListener('touchend', e => {
@@ -755,7 +845,7 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 function showError() {
-  ['page-pulse','page-futures','page-oi','page-rollover','page-basis'].forEach(id => {
+  ['page-pulse','page-futures','page-oi','page-rollover','page-basis','page-scanner','page-screener'].forEach(id => {
     const p = $(id);
     if (p && !p.querySelector('.error-state')) {
       p.innerHTML = `
@@ -1314,6 +1404,347 @@ function showBasisSheet(r){
 }
 window.showBasisSheet=showBasisSheet;
 window.renderBasis=renderBasis;
+
+/* ══════════════════════════════════════════════════════════════════════
+   scanner.js — Strategy Scanner tab (Session 3)
+   Reads: data.strategy_scanner[] — each entry has:
+     symbol, strategy, direction, entry, target, sl, risk_reward,
+     confidence, basis_pct, pattern, trend, expiry, lot_size, days_to_exp
+   Falls back gracefully to futures[] if strategy_scanner is absent.
+   ══════════════════════════════════════════════════════════════════════ */
+let _scanFilter = '';
+let _scanSort   = 'conf_desc';
+let _scanDir    = '';
+
+function renderScanner(data) {
+  const pg = document.getElementById('page-scanner');
+  if (!data || !pg) return;
+
+  /* ── source: prefer strategy_scanner[], fall back to deriving from futures ── */
+  let rows = [];
+  if (data.strategy_scanner && data.strategy_scanner.length) {
+    rows = data.strategy_scanner;
+  } else {
+    /* Derive virtual strategy cards from futures[] near-expiry */
+    rows = (data.futures || [])
+      .filter(r => r.expiry_rank === 1)
+      .map(r => {
+        const p = parseFloat(r.chg_pct  || 0);
+        const o = parseFloat(r.oi_chg_pct || 0);
+        const bp = parseFloat(r.basis_pct || 0);
+        let strategy = 'Long Futures', direction = 'bullish';
+        if (r.trend === 'SB' || r.trend === 'LU') { strategy = 'Short Futures'; direction = 'bearish'; }
+        if (r.trend === 'SC') { strategy = 'Bull Spread'; direction = 'bullish'; }
+        const conf = Math.min(100, Math.abs(p) * 10 + Math.abs(o) * 5 + 20);
+        const ltp  = parseFloat(r.ltp || 0);
+        const sl_mult   = direction === 'bullish' ? 0.97 : 1.03;
+        const tgt_mult  = direction === 'bullish' ? 1.05 : 0.95;
+        const rr = ltp > 0
+          ? Math.abs((ltp * tgt_mult - ltp) / (ltp - ltp * sl_mult)).toFixed(1)
+          : '—';
+        return {
+          ...r,
+          strategy, direction,
+          entry:        ltp,
+          target:       +(ltp * tgt_mult).toFixed(2),
+          sl:           +(ltp * sl_mult).toFixed(2),
+          risk_reward:  rr,
+          confidence:   +conf.toFixed(0),
+        };
+      })
+      .filter(r => r.entry > 0);
+  }
+
+  if (!rows.length) {
+    pg.innerHTML = `<div class="error-state"><div class="err-icon">🎯</div>
+      <div>No strategy data in snapshot</div>
+      <div style="font-size:11px;color:var(--fg2);margin-top:6px">Ensure strategy_scanner[] is populated in desktop app</div></div>`;
+    return;
+  }
+
+  const bullCount = rows.filter(r => (r.direction||'').toLowerCase().includes('bull')).length;
+  const bearCount = rows.filter(r => (r.direction||'').toLowerCase().includes('bear')).length;
+  const neuCount  = rows.length - bullCount - bearCount;
+
+  pg.innerHTML = `
+    <!-- Summary strip -->
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <div class="card" style="flex:1;text-align:center;padding:8px;border-color:#064e1a">
+        <div style="font-size:22px;font-weight:700;color:var(--green)">${bullCount}</div>
+        <div style="font-size:10px;color:var(--fg2)">Bullish</div>
+      </div>
+      <div class="card" style="flex:1;text-align:center;padding:8px">
+        <div style="font-size:22px;font-weight:700;color:var(--fg2)">${neuCount}</div>
+        <div style="font-size:10px;color:var(--fg2)">Neutral</div>
+      </div>
+      <div class="card" style="flex:1;text-align:center;padding:8px;border-color:#4e0606">
+        <div style="font-size:22px;font-weight:700;color:var(--red)">${bearCount}</div>
+        <div style="font-size:10px;color:var(--fg2)">Bearish</div>
+      </div>
+    </div>
+    <!-- Filters -->
+    <div class="filter-bar">
+      <input id="sc-search" type="search" placeholder="Symbol…" value="${_scanFilter}">
+      <select id="sc-dir">
+        <option value="">All Directions</option>
+        <option value="bullish"${_scanDir==='bullish'?' selected':''}>Bullish</option>
+        <option value="bearish"${_scanDir==='bearish'?' selected':''}>Bearish</option>
+        <option value="neutral"${_scanDir==='neutral'?' selected':''}>Neutral</option>
+      </select>
+      <select id="sc-sort">
+        <option value="conf_desc"${_scanSort==='conf_desc'?' selected':''}>Conf% ↓</option>
+        <option value="rr_desc"${_scanSort==='rr_desc'?' selected':''}>R:R ↓</option>
+        <option value="sym_asc"${_scanSort==='sym_asc'?' selected':''}>Symbol A–Z</option>
+      </select>
+    </div>
+    <div id="sc-count" style="font-size:11px;color:var(--fg2);margin-bottom:6px"></div>
+    <div id="sc-cards"></div>`;
+
+  function apply() {
+    _scanFilter = document.getElementById('sc-search').value.trim().toUpperCase();
+    _scanDir    = document.getElementById('sc-dir').value;
+    _scanSort   = document.getElementById('sc-sort').value;
+    let list = rows.filter(r => {
+      if (_scanFilter && !(r.symbol||'').includes(_scanFilter)) return false;
+      if (_scanDir && !(r.direction||'').toLowerCase().includes(_scanDir)) return false;
+      return true;
+    });
+    list.sort((a,b) => {
+      if (_scanSort === 'rr_desc') return parseFloat(b.risk_reward||0) - parseFloat(a.risk_reward||0);
+      if (_scanSort === 'sym_asc') return (a.symbol||'').localeCompare(b.symbol||'');
+      return parseFloat(b.confidence||0) - parseFloat(a.confidence||0);
+    });
+    document.getElementById('sc-count').textContent = `${list.length} strategies`;
+    document.getElementById('sc-cards').innerHTML = list.map(r => {
+      const dir = (r.direction||'neutral').toLowerCase();
+      const cls = dir.includes('bull') ? 'strat-bullish' : dir.includes('bear') ? 'strat-bearish' : 'strat-neutral';
+      const label = dir.includes('bull') ? '▲ Bullish' : dir.includes('bear') ? '▼ Bearish' : '● Neutral';
+      const conf = parseFloat(r.confidence || 0);
+      const confCl = conf >= 70 ? 'var(--green)' : conf >= 45 ? 'var(--accent)' : 'var(--amber)';
+      return `<div class="strat-card" onclick='showStratSheet(${JSON.stringify(r)})'>
+        <div class="strat-header">
+          <div>
+            <div class="strat-sym">${ban_badge(r)}${r.symbol}</div>
+            <div style="font-size:11px;color:var(--fg2);margin-top:2px">${r.strategy||'—'}</div>
+          </div>
+          <div style="text-align:right">
+            <span class="strat-type ${cls}">${label}</span>
+            <div style="font-size:11px;margin-top:4px;color:${confCl};font-weight:700">${conf.toFixed(0)}% conf</div>
+          </div>
+        </div>
+        <div class="strat-row">
+          <span>Entry <strong>₹${parseFloat(r.entry||0).toFixed(2)}</strong></span>
+          <span>Target <strong style="color:var(--green)">₹${parseFloat(r.target||0).toFixed(2)}</strong></span>
+          <span>SL <strong style="color:var(--red)">₹${parseFloat(r.sl||0).toFixed(2)}</strong></span>
+          <span>R:R <strong>${r.risk_reward||'—'}</strong></span>
+          <span>Exp <strong>${r.days_to_exp||'—'}d</strong></span>
+          <span>Lot <strong>${r.lot_size||'—'}</strong></span>
+        </div>
+        <div class="strat-conf">
+          <div class="strat-conf-fill" style="width:${Math.min(conf,100).toFixed(0)}%;background:${confCl}"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('sc-search').addEventListener('input', apply);
+  document.getElementById('sc-dir').addEventListener('change', apply);
+  document.getElementById('sc-sort').addEventListener('change', apply);
+  apply();
+}
+
+function showStratSheet(r) {
+  if (typeof r === 'string') try { r = JSON.parse(r); } catch { return; }
+  const conf = parseFloat(r.confidence||0);
+  const confCl = conf >= 70 ? 'var(--green)' : conf >= 45 ? 'var(--accent)' : 'var(--amber)';
+  const dir    = (r.direction||'neutral').toLowerCase();
+  const dirCls = dir.includes('bull') ? 'up' : dir.includes('bear') ? 'down' : 'neu';
+  openSheet(`
+    <div class="sheet-row"><span class="lbl">Strategy</span><span class="val bold">${r.strategy||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Direction</span><span class="val ${dirCls} bold">${r.direction||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Confidence</span><span class="val bold" style="color:${confCl}">${conf.toFixed(0)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Entry</span><span class="val bold">₹${parseFloat(r.entry||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">Target</span><span class="val up bold">₹${parseFloat(r.target||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">Stop Loss</span><span class="val down bold">₹${parseFloat(r.sl||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">Risk : Reward</span><span class="val">${r.risk_reward||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Signal</span><span class="val">${sig_badge(r.trend)}</span></div>
+    <div class="sheet-row"><span class="lbl">Pattern</span><span class="val">${r.pattern||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Basis %</span><span class="val">${parseFloat(r.basis_pct||0).toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Conv Score</span><span class="val">${parseFloat(r.conv_score||0).toFixed(1)}</span></div>
+    <div class="sheet-row"><span class="lbl">Lot Size</span><span class="val">${r.lot_size||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Days to Exp</span><span class="val">${r.days_to_exp||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Expiry</span><span class="val">${r.expiry||'—'}</span></div>
+  `, r.symbol + ' — Strategy');
+}
+window.showStratSheet  = showStratSheet;
+window.renderScanner   = renderScanner;
+
+/* ══════════════════════════════════════════════════════════════════════
+   screener.js — Options Screener tab (Session 3)
+   Reads: data.options_screener[] — each entry has:
+     symbol, option_type (CE/PE), strike, expiry, ltp, iv, delta,
+     theta, vega, oi, oi_chg, oi_chg_pct, volume, signal, pattern,
+     days_to_exp, lot_size, spot, premium_pct
+   Falls back gracefully: shows summary cards + empty state with hint.
+   ══════════════════════════════════════════════════════════════════════ */
+let _scrFilter  = '';
+let _scrType    = '';
+let _scrSignal  = '';
+let _scrSort    = 'oi_desc';
+
+function renderScreener(data) {
+  const pg = document.getElementById('page-screener');
+  if (!data || !pg) return;
+
+  const rows  = data.options_screener || [];
+  const os    = data.options_summary  || {};
+
+  /* ── Options Summary strip (always shown) ── */
+  const pcr   = parseFloat(os.pcr  || 0);
+  const ivVal = parseFloat(os.avg_iv|| os.iv || 0);
+  const pcrCls = pcr > 1.2 ? 'down' : pcr < 0.8 ? 'up' : 'neu';
+  const sentiment = pcr > 1.2 ? 'Bearish' : pcr < 0.8 ? 'Bullish' : 'Neutral';
+
+  const summaryHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+      <div class="card" style="text-align:center;padding:8px">
+        <div style="font-size:22px;font-weight:700" class="${pcrCls}">${pcr > 0 ? pcr.toFixed(2) : '—'}</div>
+        <div style="font-size:10px;color:var(--fg2)">PCR (OI)</div>
+        <div style="font-size:10px;font-weight:600" class="${pcrCls}">${pcr > 0 ? sentiment : ''}</div>
+      </div>
+      <div class="card" style="text-align:center;padding:8px">
+        <div style="font-size:22px;font-weight:700;color:var(--amber)">${ivVal > 0 ? ivVal.toFixed(1)+'%' : '—'}</div>
+        <div style="font-size:10px;color:var(--fg2)">Avg IV</div>
+      </div>
+      <div class="card" style="text-align:center;padding:8px">
+        <div style="font-size:22px;font-weight:700;color:var(--fg)">${rows.length}</div>
+        <div style="font-size:10px;color:var(--fg2)">Opportunities</div>
+      </div>
+    </div>`;
+
+  if (!rows.length) {
+    pg.innerHTML = summaryHTML + `
+      <div class="error-state">
+        <div class="err-icon">🔎</div>
+        <div>No options screener data</div>
+        <div style="font-size:11px;color:var(--fg2);margin-top:6px;max-width:260px;text-align:center">
+          Click <strong>Load Options</strong> in the desktop app and rebuild the snapshot,
+          or check that op*.csv files are present.
+        </div>
+      </div>`;
+    return;
+  }
+
+  pg.innerHTML = summaryHTML + `
+    <!-- Filters -->
+    <div class="filter-bar">
+      <input id="scr-search" type="search" placeholder="Symbol…" value="${_scrFilter}">
+      <select id="scr-type">
+        <option value="">CE + PE</option>
+        <option value="CE"${_scrType==='CE'?' selected':''}>CE only</option>
+        <option value="PE"${_scrType==='PE'?' selected':''}>PE only</option>
+      </select>
+      <select id="scr-signal">
+        <option value="">All Signals</option>
+        <option value="LB"${_scrSignal==='LB'?' selected':''}>Long Buildup</option>
+        <option value="SB"${_scrSignal==='SB'?' selected':''}>Short Buildup</option>
+        <option value="LU"${_scrSignal==='LU'?' selected':''}>Long Unwind</option>
+        <option value="SC"${_scrSignal==='SC'?' selected':''}>Short Cover</option>
+      </select>
+      <select id="scr-sort">
+        <option value="oi_desc"${_scrSort==='oi_desc'?' selected':''}>OI ↓</option>
+        <option value="oichg_desc"${_scrSort==='oichg_desc'?' selected':''}>OI Chg% ↓</option>
+        <option value="iv_desc"${_scrSort==='iv_desc'?' selected':''}>IV ↓</option>
+        <option value="vol_desc"${_scrSort==='vol_desc'?' selected':''}>Volume ↓</option>
+        <option value="theta_asc"${_scrSort==='theta_asc'?' selected':''}>Theta (decay)</option>
+      </select>
+    </div>
+    <div id="scr-count" style="font-size:11px;color:var(--fg2);margin-bottom:6px"></div>
+    <div class="tbl-wrap">
+      <table id="tbl-screener">
+        <thead><tr>
+          <th>Symbol</th><th>Type</th><th>Strike</th>
+          <th>LTP</th><th>IV%</th><th>OI</th><th>OI Chg%</th><th>Sig</th>
+        </tr></thead>
+        <tbody id="scr-tbody"></tbody>
+      </table>
+    </div>`;
+
+  function apply() {
+    _scrFilter = document.getElementById('scr-search').value.trim().toUpperCase();
+    _scrType   = document.getElementById('scr-type').value;
+    _scrSignal = document.getElementById('scr-signal').value;
+    _scrSort   = document.getElementById('scr-sort').value;
+
+    let list = rows.filter(r => {
+      if (_scrFilter && !(r.symbol||'').includes(_scrFilter)) return false;
+      if (_scrType   && r.option_type !== _scrType) return false;
+      if (_scrSignal && r.signal !== _scrSignal)    return false;
+      return true;
+    });
+    list.sort((a,b) => {
+      if (_scrSort === 'oichg_desc') return (b.oi_chg_pct||0)   - (a.oi_chg_pct||0);
+      if (_scrSort === 'iv_desc')    return (b.iv||0)             - (a.iv||0);
+      if (_scrSort === 'vol_desc')   return (b.volume||0)         - (a.volume||0);
+      if (_scrSort === 'theta_asc')  return (a.theta||0)          - (b.theta||0);
+      return (b.oi||0) - (a.oi||0);
+    });
+    document.getElementById('scr-count').textContent = `${list.length} contracts`;
+    document.getElementById('scr-tbody').innerHTML = list.map(r => {
+      const ot   = r.option_type || '—';
+      const otCl = ot === 'CE' ? 'up' : ot === 'PE' ? 'down' : '';
+      const ocp  = parseFloat(r.oi_chg_pct || 0);
+      const ltp  = parseFloat(r.ltp || 0);
+      const iv   = parseFloat(r.iv  || 0);
+      return `<tr onclick='showScrSheet(${JSON.stringify(r)})'>
+        <td><strong>${r.symbol}</strong>
+          ${r.pattern ? `<span class="scr-tag scr-hit">${r.pattern}</span>` : ''}
+        </td>
+        <td class="${otCl} bold">${ot}</td>
+        <td>₹${parseFloat(r.strike||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+        <td>₹${ltp.toFixed(2)}</td>
+        <td class="${iv>30?'down':iv>20?'neu':'up'}">${iv > 0 ? iv.toFixed(1)+'%' : '—'}</td>
+        <td>${fmt_oi(r.oi)}</td>
+        <td class="${ocp>=0?'up':'down'}">${ocp>=0?'+':''}${ocp.toFixed(2)}%</td>
+        <td>${sig_badge(r.signal)}</td>
+      </tr>`;
+    }).join('');
+    makeSortable('tbl-screener');
+  }
+
+  document.getElementById('scr-search').addEventListener('input',  apply);
+  document.getElementById('scr-type').addEventListener('change',   apply);
+  document.getElementById('scr-signal').addEventListener('change', apply);
+  document.getElementById('scr-sort').addEventListener('change',   apply);
+  apply();
+}
+
+function showScrSheet(r) {
+  if (typeof r === 'string') try { r = JSON.parse(r); } catch { return; }
+  const ot   = r.option_type || '—';
+  const otCl = ot === 'CE' ? 'up' : ot === 'PE' ? 'down' : '';
+  const ocp  = parseFloat(r.oi_chg_pct || 0);
+  openSheet(`
+    <div class="sheet-row"><span class="lbl">Option Type</span><span class="val ${otCl} bold">${ot}</span></div>
+    <div class="sheet-row"><span class="lbl">Strike</span><span class="val bold">₹${parseFloat(r.strike||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</span></div>
+    <div class="sheet-row"><span class="lbl">Expiry</span><span class="val">${r.expiry||'—'} (${r.days_to_exp||'—'}d)</span></div>
+    <div class="sheet-row"><span class="lbl">LTP</span><span class="val bold">₹${parseFloat(r.ltp||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">Spot</span><span class="val">₹${parseFloat(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
+    <div class="sheet-row"><span class="lbl">IV</span><span class="val">${parseFloat(r.iv||0).toFixed(1)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Delta</span><span class="val">${parseFloat(r.delta||0).toFixed(3)}</span></div>
+    <div class="sheet-row"><span class="lbl">Theta</span><span class="val down">${parseFloat(r.theta||0).toFixed(3)}</span></div>
+    <div class="sheet-row"><span class="lbl">Vega</span><span class="val">${parseFloat(r.vega||0).toFixed(3)}</span></div>
+    <div class="sheet-row"><span class="lbl">Open Interest</span><span class="val">${fmt_oi(r.oi)} lots</span></div>
+    <div class="sheet-row"><span class="lbl">OI Change</span><span class="val ${ocp>=0?'up':'down'}">${ocp>=0?'+':''}${ocp.toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Volume</span><span class="val">${fmt_oi(r.volume)}</span></div>
+    <div class="sheet-row"><span class="lbl">Signal</span><span class="val">${sig_badge(r.signal)}</span></div>
+    <div class="sheet-row"><span class="lbl">Pattern</span><span class="val">${r.pattern||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Premium %</span><span class="val">${parseFloat(r.premium_pct||0).toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Lot Size</span><span class="val">${r.lot_size||'—'}</span></div>
+  `, r.symbol + ' ' + ot + ' ' + parseFloat(r.strike||0).toLocaleString('en-IN',{maximumFractionDigits:0}));
+}
+window.showScrSheet   = showScrSheet;
+window.renderScreener = renderScreener;
 
   </script>
 </body>
