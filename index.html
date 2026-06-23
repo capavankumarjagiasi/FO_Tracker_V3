@@ -514,7 +514,7 @@ tr.sc td { color: #a855f7; }
    ══════════════════════════════════════════════════════════════════════ */
 
 // ── Config — CHANGE THIS URL to your GitHub raw JSON URL ─────────────
-const DATA_URL = './fo_snapshot_v3.json';  // Relative — same GitHub Pages origin, no CORS
+const DATA_URL = './fo_snapshot_v3.json';
 const REFRESH_MS = 5 * 60 * 1000;  // 5 min
 
 // ── Global state ──────────────────────────────────────────────────────
@@ -789,292 +789,169 @@ document.addEventListener('DOMContentLoaded', () => {
   loadData();
 });
 
-/* ══════════════════════════════════════════════════════════════════════
-   pulse.js — Market Pulse tab
-   ══════════════════════════════════════════════════════════════════════ */
-
+/* pulse.js — fixed for v3 snapshot field names */
 function renderPulse(data) {
   const pg = document.getElementById('page-pulse');
   if (!data || !pg) return;
+  const ms   = data.market_summary || {};
+  const ad   = ms.advance_decline || {};
+  const hm   = (data.market_pulse || {}).heatmap || [];
+  const ban  = ms.ban_list || [];
+  const near = (data.futures || []).filter(r => r.expiry_rank === 1);
+  const sigCount = {LB:0,SB:0,LU:0,SC:0};
+  near.forEach(r => { if(r.trend && sigCount[r.trend]!==undefined) sigCount[r.trend]++; });
+  const sorted  = [...near].sort((a,b)=>(b.chg_pct||0)-(a.chg_pct||0));
+  const gainers5= sorted.slice(0,5);
+  const losers5 = sorted.slice(-5).reverse();
+  const niftyUp = (ms.nifty_chg_pct||0)>=0;
+  const bnfUp   = (ms.banknifty_chg_pct||0)>=0;
 
-  const meta = data.meta || {};
-  const near = data.near_month || [];
-  const sb   = data.signal_breakdown || {};
-  const ban  = data.ban_list || {};
-
-  // ── Compute summary stats ─────────────────────────────────────────
-  let advances = 0, declines = 0, unchanged = 0;
-  let totalOI  = 0;
-  near.forEach(r => {
-    const pc = parseFloat(r.price_chg || 0);
-    if (pc > 0) advances++; else if (pc < 0) declines++; else unchanged++;
-    totalOI += parseInt(r.oi || 0);
-  });
-
-  const lbCount = (sb.LB || []).length;
-  const sbCount = (sb.SB || []).length;
-  const luCount = (sb.LU || []).length;
-  const scCount = (sb.SC || []).length;
-
-  // ── Top gainers/losers by price ───────────────────────────────────
-  const sorted = [...near].sort((a,b) => parseFloat(b.price_chg||0) - parseFloat(a.price_chg||0));
-  const gainers5 = sorted.slice(0,5);
-  const losers5  = sorted.slice(-5).reverse();
-
-  // ── Build HTML ────────────────────────────────────────────────────
   pg.innerHTML = `
-    <div id="ptr-spinner" class="neu" style="text-align:center;padding:6px">↻</div>
-
-    <!-- Summary cards -->
     <div class="summary-row">
       <div class="summary-card">
-        <div class="lbl">Total Symbols</div>
-        <div class="val">${near.length}</div>
-        <div class="chg neu">F&O Universe</div>
+        <div class="lbl">NIFTY</div>
+        <div class="val">₹${ms.nifty_ltp?Number(ms.nifty_ltp).toLocaleString('en-IN',{maximumFractionDigits:0}):'—'}</div>
+        <div class="chg ${niftyUp?'up':'down'}">${niftyUp?'+':''}${(ms.nifty_chg_pct||0).toFixed(2)}%</div>
       </div>
       <div class="summary-card">
-        <div class="lbl">Advances / Declines</div>
-        <div class="val"><span class="up">${advances}</span> / <span class="down">${declines}</span></div>
-        <div class="chg neu">Unchanged: ${unchanged}</div>
+        <div class="lbl">BANKNIFTY</div>
+        <div class="val">₹${ms.banknifty_ltp?Number(ms.banknifty_ltp).toLocaleString('en-IN',{maximumFractionDigits:0}):'—'}</div>
+        <div class="chg ${bnfUp?'up':'down'}">${bnfUp?'+':''}${(ms.banknifty_chg_pct||0).toFixed(2)}%</div>
       </div>
       <div class="summary-card">
-        <div class="lbl">Total OI</div>
-        <div class="val">${fmt_oi(totalOI)}</div>
-        <div class="chg neu">Near Month</div>
+        <div class="lbl">Advances/Declines</div>
+        <div class="val"><span class="up">${ad.advances||0}</span>/<span class="down">${ad.declines||0}</span></div>
+        <div class="chg neu">Unch: ${ad.unchanged||0}</div>
       </div>
       <div class="summary-card">
         <div class="lbl">Ban List</div>
-        <div class="val down">${(ban.current||[]).length}</div>
-        <div class="chg neu">${(ban.current||[]).join(', ') || 'None'}</div>
+        <div class="val down">${ban.length}</div>
+        <div class="chg neu" style="font-size:9px">${ban.slice(0,2).join(', ')||'None'}</div>
       </div>
     </div>
-
-    <!-- Signal breakdown -->
     <div class="sec-head">Signal Breakdown</div>
     <div class="summary-row" style="grid-template-columns:repeat(4,1fr)">
       <div class="summary-card" style="border-color:#064e1a">
-        <div class="lbl">Long Buildup</div>
-        <div class="val up bold">${lbCount}</div>
-        <div class="chg" style="font-size:9px;color:var(--fg2)">Price↑ OI↑</div>
+        <div class="lbl">Long Buildup</div><div class="val up bold">${sigCount.LB}</div>
+        <div style="font-size:9px;color:var(--fg2)">Price↑ OI↑</div>
       </div>
       <div class="summary-card" style="border-color:#4e0606">
-        <div class="lbl">Short Buildup</div>
-        <div class="val down bold">${sbCount}</div>
-        <div class="chg" style="font-size:9px;color:var(--fg2)">Price↓ OI↑</div>
+        <div class="lbl">Short Buildup</div><div class="val down bold">${sigCount.SB}</div>
+        <div style="font-size:9px;color:var(--fg2)">Price↓ OI↑</div>
       </div>
       <div class="summary-card" style="border-color:#4e3006">
-        <div class="lbl">Long Unwinding</div>
-        <div class="val bold" style="color:var(--amber)">${luCount}</div>
-        <div class="chg" style="font-size:9px;color:var(--fg2)">Price↓ OI↓</div>
+        <div class="lbl">Long Unwind</div><div class="val bold" style="color:var(--amber)">${sigCount.LU}</div>
+        <div style="font-size:9px;color:var(--fg2)">Price↓ OI↓</div>
       </div>
       <div class="summary-card" style="border-color:#2e0650">
-        <div class="lbl">Short Covering</div>
-        <div class="val bold" style="color:var(--purple)">${scCount}</div>
-        <div class="chg" style="font-size:9px;color:var(--fg2)">Price↑ OI↓</div>
+        <div class="lbl">Short Cover</div><div class="val bold" style="color:var(--purple)">${sigCount.SC}</div>
+        <div style="font-size:9px;color:var(--fg2)">Price↑ OI↓</div>
       </div>
     </div>
-
-    <!-- Top gainers -->
     <div class="sec-head">Top 5 Gainers</div>
-    <div class="tbl-wrap">
-      <table id="tbl-gainers">
-        <thead><tr>
-          <th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI Chg</th><th>Signal</th>
-        </tr></thead>
-        <tbody>
-          ${gainers5.map(r => `
-            <tr class="${row_cls(r.signal)}" onclick="showSymbolSheet(${JSON.stringify(r).replace(/"/g,'&quot;')})">
-              <td>${ban_badge(r)}${r.symbol}</td>
-              <td class="bold">₹${parseFloat(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</td>
-              <td>${fmt_pct(r.price_chg)}</td>
-              <td>${fmt_pct(r.oi_chg ? r.oi_chg/(r.oi-r.oi_chg||1)*100 : 0, 1)}</td>
-              <td>${sig_badge(r.signal)}</td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Top losers -->
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI Chg%</th><th>Sig</th></tr></thead>
+      <tbody>${gainers5.map(r=>`<tr class="${row_cls(r.trend)}" onclick='showSymbolSheet(${JSON.stringify(r)})'>
+        <td>${ban_badge(r)}<strong>${r.symbol}</strong></td>
+        <td>₹${(r.ltp||0).toFixed(2)}</td>
+        <td class="${(r.chg_pct||0)>=0?'up':'down'}">${(r.chg_pct||0)>=0?'+':''}${(r.chg_pct||0).toFixed(2)}%</td>
+        <td class="${(r.oi_chg_pct||0)>=0?'up':'down'}">${(r.oi_chg_pct||0)>=0?'+':''}${(r.oi_chg_pct||0).toFixed(2)}%</td>
+        <td>${sig_badge(r.trend)}</td></tr>`).join('')}
+      </tbody></table></div>
     <div class="sec-head">Top 5 Losers</div>
-    <div class="tbl-wrap">
-      <table id="tbl-losers">
-        <thead><tr>
-          <th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI Chg</th><th>Signal</th>
-        </tr></thead>
-        <tbody>
-          ${losers5.map(r => `
-            <tr class="${row_cls(r.signal)}" onclick="showSymbolSheet(${JSON.stringify(r).replace(/"/g,'&quot;')})">
-              <td>${ban_badge(r)}${r.symbol}</td>
-              <td class="bold">₹${parseFloat(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</td>
-              <td>${fmt_pct(r.price_chg)}</td>
-              <td>${fmt_pct(r.oi_chg ? r.oi_chg/(r.oi-r.oi_chg||1)*100 : 0, 1)}</td>
-              <td>${sig_badge(r.signal)}</td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- Heatmap -->
-    <div class="sec-head">
-      Heat Map
-      <select id="hm-filter" style="margin-left:auto;font-size:11px;
-        background:var(--panel);border:1px solid var(--border);
-        color:var(--fg);border-radius:4px;padding:2px 6px">
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI Chg%</th><th>Sig</th></tr></thead>
+      <tbody>${losers5.map(r=>`<tr class="${row_cls(r.trend)}" onclick='showSymbolSheet(${JSON.stringify(r)})'>
+        <td>${ban_badge(r)}<strong>${r.symbol}</strong></td>
+        <td>₹${(r.ltp||0).toFixed(2)}</td>
+        <td class="${(r.chg_pct||0)>=0?'up':'down'}">${(r.chg_pct||0)>=0?'+':''}${(r.chg_pct||0).toFixed(2)}%</td>
+        <td class="${(r.oi_chg_pct||0)>=0?'up':'down'}">${(r.oi_chg_pct||0)>=0?'+':''}${(r.oi_chg_pct||0).toFixed(2)}%</td>
+        <td>${sig_badge(r.trend)}</td></tr>`).join('')}
+      </tbody></table></div>
+    <div class="sec-head">Heat Map
+      <select id="hm-filter" style="margin-left:auto;font-size:11px;background:var(--panel);
+        border:1px solid var(--border);color:var(--fg);border-radius:4px;padding:2px 6px">
         <option value="rank50">Top 50 by Score</option>
         <option value="all">All Symbols</option>
-        <option value="g25l25">Top 25 Gain + 25 Loss</option>
+        <option value="g25l25">Top 25G + 25L</option>
       </select>
     </div>
-    <div id="heatmap-grid"></div>
-  `;
+    <div id="heatmap-grid"></div>`;
 
-  renderHeatmap(near);
-  document.getElementById('hm-filter').addEventListener('change', e => {
-    renderHeatmap(near, e.target.value);
-  });
+  const hmRows = hm.length ? hm : near;
+  renderHeatmap(hmRows);
+  document.getElementById('hm-filter').addEventListener('change',e=>renderHeatmap(hmRows,e.target.value));
 }
 
-// ── Heatmap renderer ──────────────────────────────────────────────────
-function renderHeatmap(rows, mode = 'rank50') {
-  const grid = document.getElementById('heatmap-grid');
-  if (!grid) return;
-
-  // Score = price_chg*0.5 + oi_chg_pct*0.5
-  function score(r) {
-    const pc  = parseFloat(r.price_chg || 0);
-    const oi  = parseInt(r.oi || 0);
-    const oic = parseInt(r.oi_chg || 0);
-    const ocp = oi > 0 && (oi-oic) > 0 ? oic/(oi-oic)*100 : 0;
-    return pc*0.5 + ocp*0.5;
-  }
-  function oiChgPct(r) {
-    const oi = parseInt(r.oi||0), oic = parseInt(r.oi_chg||0);
-    return oi>0&&(oi-oic)>0 ? (oic/(oi-oic)*100).toFixed(1) : '0.0';
-  }
-
+function renderHeatmap(rows, mode='rank50') {
+  const grid=document.getElementById('heatmap-grid'); if(!grid) return;
+  function sc(r){return (parseFloat(r.chg_pct||0)*0.5)+(parseFloat(r.oi_chg_pct||0)*0.5);}
+  const scored=[...rows].map(r=>({...r,_sc:sc(r)})).sort((a,b)=>b._sc-a._sc);
   let heat;
-  const scored = rows.map(r => ({...r, _score: score(r)}))
-                     .sort((a,b) => b._score - a._score);
+  if(mode==='all') heat=scored;
+  else if(mode==='g25l25'){
+    const byP=[...rows].sort((a,b)=>(b.chg_pct||0)-(a.chg_pct||0));
+    heat=[...byP.slice(0,25),...byP.slice(-25).reverse()];
+  } else heat=scored.slice(0,50);
 
-  if (mode === 'all') {
-    heat = scored;
-  } else if (mode === 'g25l25') {
-    const byPrice = [...rows].sort((a,b) =>
-      parseFloat(b.price_chg||0) - parseFloat(a.price_chg||0));
-    heat = [...byPrice.slice(0,25), ...byPrice.slice(-25).reverse()];
-  } else {
-    heat = scored.slice(0, 50);
+  function ts(s,p){
+    const a=Math.abs(s);
+    if(a<1) return {bg:'#1a1f2e',fg:p>=0?'#22c55e':'#ef4444',brd:'#2a3040'};
+    if(s>=5) return {bg:'#004d00',fg:'#fff',brd:'#006600'};
+    if(s>=3) return {bg:'#006600',fg:'#fff',brd:'#008800'};
+    if(s>=1) return {bg:'#1a8c1a',fg:'#fff',brd:'#22aa22'};
+    if(s>=-3) return {bg:'#991a1a',fg:'#fff',brd:'#bb2222'};
+    if(s>=-5) return {bg:'#cc0000',fg:'#fff',brd:'#dd1111'};
+    return {bg:'#800000',fg:'#fff',brd:'#990000'};
   }
-
-  function tileStyle(sc, pc) {
-    const a = Math.abs(sc);
-    if (a < 1.0)  return { bg: '#1a1f2e', fg: pc>=0 ? '#22c55e' : '#ef4444', brd: '#2a3040' };
-    if (sc >= 5)  return { bg: '#004d00', fg: '#ffffff', brd: '#006600' };
-    if (sc >= 3)  return { bg: '#006600', fg: '#ffffff', brd: '#008800' };
-    if (sc >= 1)  return { bg: '#1a8c1a', fg: '#ffffff', brd: '#22aa22' };
-    if (sc >= -3) return { bg: '#991a1a', fg: '#ffffff', brd: '#bb2222' };
-    if (sc >= -5) return { bg: '#cc0000', fg: '#ffffff', brd: '#dd1111' };
-    return { bg: '#800000', fg: '#ffffff', brd: '#990000' };
-  }
-
-  const SIG_COLS = {LB:'#00e676',SB:'#ff5252',LU:'#ffab40',SC:'#ce93d8'};
-
-  grid.innerHTML = heat.map((r, idx) => {
-    const sc  = r._score || score(r);
-    const pc  = parseFloat(r.price_chg || 0);
-    const ocp = oiChgPct(r);
-    const ltp = parseFloat(r.ltp || 0);
-    const {bg, fg, brd} = tileStyle(sc, pc);
-    const isTop = idx < 10;
-    const rankBadge = isTop
-      ? `<div style="position:absolute;top:3px;left:3px;background:#1a7abf;
-           color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px">#${idx+1}</div>`
-      : '';
-    const sigCol = SIG_COLS[r.signal] || '';
-    const sigBdg = r.signal && sigCol
-      ? `<div style="position:absolute;bottom:4px;left:4px;background:${sigCol};
-           color:#000;font-size:${isTop?'9':'8'}px;font-weight:700;
-           padding:1px ${isTop?'6':'4'}px;border-radius:3px">${r.signal}</div>`
-      : '';
-    const height = isTop ? '110px' : '52px';
-    const ltpSize = isTop ? '15px' : '11px';
-    const pctSize = isTop ? '11px' : '9px';
-
-    return `
-      <div class="hm-tile" style="background:${bg};border:1px solid ${brd};
-        min-height:${height};position:relative;color:${fg}"
-        onclick='showSymbolSheet(${JSON.stringify(r)})'>
-        ${rankBadge}
-        <div class="hm-sym" style="color:${fg}">${r.symbol}</div>
-        <div class="hm-ltp" style="font-size:${ltpSize};color:${fg}">
-          ₹${ltp >= 10000 ? ltp.toFixed(0) : ltp.toFixed(1)}
-        </div>
-        <div class="hm-pct" style="font-size:${pctSize};color:${fg}">
-          ${pc >= 0 ? '+' : ''}${pc.toFixed(2)}%
-        </div>
-        <div class="hm-oi" style="color:${parseFloat(ocp)>=0?'#00e676':'#ff5252'}">
-          OI ${parseFloat(ocp)>=0?'+':''}${ocp}%
-        </div>
-        ${sigBdg}
-      </div>`;
+  const SC2={LB:'#00e676',SB:'#ff5252',LU:'#ffab40',SC:'#ce93d8'};
+  grid.innerHTML=heat.map((r,i)=>{
+    const s=r._sc||sc(r),p=parseFloat(r.chg_pct||0),o=parseFloat(r.oi_chg_pct||0);
+    const l=parseFloat(r.ltp||0),{bg,fg,brd}=ts(s,p),top=i<10;
+    const sig=r.trend||r.signal||'';
+    const rb=top?`<div style="position:absolute;top:3px;left:3px;background:#1a7abf;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px">#${i+1}</div>`:'';
+    const sc2=SC2[sig]||'';
+    const sb2=sig&&sc2?`<div style="position:absolute;bottom:3px;left:3px;background:${sc2};color:#000;font-size:${top?9:7}px;font-weight:700;padding:1px ${top?6:4}px;border-radius:3px">${sig}</div>`:'';
+    return `<div class="hm-tile" style="background:${bg};border:1px solid ${brd};min-height:${top?110:52}px;position:relative;color:${fg}" onclick='showSymbolSheet(${JSON.stringify({...r,signal:sig,lot:r.lot_size})})'>
+      ${rb}
+      <div style="font-size:11px;font-weight:700;color:${fg}">${r.symbol}</div>
+      <div style="font-size:${top?14:10}px;font-weight:700;color:${fg}">₹${l>=10000?l.toFixed(0):l.toFixed(1)}</div>
+      <div style="font-size:${top?10:8}px;color:${fg}">${p>=0?'+':''}${p.toFixed(2)}%</div>
+      <div style="font-size:8px;color:${o>=0?'#00e676':'#ff5252'}">OI ${o>=0?'+':''}${o.toFixed(1)}%</div>
+      ${sb2}</div>`;
   }).join('');
 }
 
-// ── Symbol detail sheet ───────────────────────────────────────────────
-function showSymbolSheet(r) {
-  if (typeof r === 'string') try { r = JSON.parse(r); } catch { return; }
-  const pc   = parseFloat(r.price_chg || 0);
-  const oi   = parseInt(r.oi || 0);
-  const oic  = parseInt(r.oi_chg || 0);
-  const oicp = oi>0&&(oi-oic)>0 ? ((oic/(oi-oic))*100).toFixed(2) : '0.00';
-
+function showSymbolSheet(r){
+  if(typeof r==='string') try{r=JSON.parse(r);}catch{return;}
+  const p=parseFloat(r.chg_pct||0),o=parseFloat(r.oi_chg_pct||0);
   openSheet(`
-    <div class="sheet-row"><span class="lbl">LTP</span>
-      <span class="val bold">₹${parseFloat(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Spot</span>
-      <span class="val">₹${parseFloat(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Price Chg</span>
-      <span class="val ${pc>=0?'up':'down'}">${pc>=0?'+':''}${pc.toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Open Interest</span>
-      <span class="val">${fmt_oi(r.oi)}</span></div>
-    <div class="sheet-row"><span class="lbl">OI Change</span>
-      <span class="val ${parseFloat(oicp)>=0?'up':'down'}">${parseFloat(oicp)>=0?'+':''}${oicp}%</span></div>
-    <div class="sheet-row"><span class="lbl">Basis</span>
-      <span class="val">${parseFloat(r.basis||0).toFixed(2)} (${parseFloat(r.basis_pct||0).toFixed(2)}%)</span></div>
-    <div class="sheet-row"><span class="lbl">Fair Value</span>
-      <span class="val">₹${parseFloat(r.fair_value||0).toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">Conv. Score</span>
-      <span class="val">${parseFloat(r.conv_score||0).toFixed(1)}</span></div>
-    <div class="sheet-row"><span class="lbl">Signal</span>
-      <span class="val">${sig_badge(r.signal)}</span></div>
-    <div class="sheet-row"><span class="lbl">Pattern</span>
-      <span class="val">${r.pattern||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Days to Exp</span>
-      <span class="val">${r.days_to_exp||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Expiry</span>
-      <span class="val">${r.expiry||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Lot Size</span>
-      <span class="val">${r.lot||'—'}</span></div>
-    ${r.alerts ? `<div class="sheet-row"><span class="lbl">Alerts</span>
-      <span class="val" style="font-size:11px">${r.alerts}</span></div>` : ''}
-  `, (r.ban_status==='ban'?'🚫 ':'')+r.symbol);
+    <div class="sheet-row"><span class="lbl">LTP</span><span class="val bold">₹${(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
+    <div class="sheet-row"><span class="lbl">Spot</span><span class="val">₹${(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
+    <div class="sheet-row"><span class="lbl">Price Chg%</span><span class="val ${p>=0?'up':'down'} bold">${p>=0?'+':''}${p.toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">OI Chg%</span><span class="val ${o>=0?'up':'down'}">${o>=0?'+':''}${o.toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Open Interest</span><span class="val">${fmt_oi(r.oi)}</span></div>
+    <div class="sheet-row"><span class="lbl">Basis%</span><span class="val">${(r.basis_pct||0).toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Fair Value</span><span class="val">₹${(r.fair_value||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">Conv Score</span><span class="val">${(r.conv_score||0).toFixed(1)}</span></div>
+    <div class="sheet-row"><span class="lbl">Signal</span><span class="val">${sig_badge(r.trend||r.signal)}</span></div>
+    <div class="sheet-row"><span class="lbl">Pattern</span><span class="val">${r.pattern||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Days to Exp</span><span class="val">${r.days_to_exp||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Expiry</span><span class="val">${r.expiry||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Lot Size</span><span class="val">${r.lot_size||r.lot||'—'}</span></div>
+    ${r.alerts?`<div class="sheet-row"><span class="lbl">Alerts</span><span class="val">${r.alerts}</span></div>`:''}
+  `,(r.ban_status==='ban'?'🚫 ':'')+r.symbol);
 }
-window.showSymbolSheet = showSymbolSheet;
-window.renderPulse     = renderPulse;
+window.showSymbolSheet=showSymbolSheet;
+window.renderPulse=renderPulse;
 
-/* ══════════════════════════════════════════════════════════════════════
-   futures.js — Futures Tracker tab
-   ══════════════════════════════════════════════════════════════════════ */
-
-let _futData = [], _futFiltered = [];
-
+/* futures.js — fixed for v3 snapshot field names */
 function renderFutures(data) {
-  const pg = document.getElementById('page-futures');
-  if (!data || !pg) return;
+  const pg=document.getElementById('page-futures');
+  if(!data||!pg) return;
+  const near=(data.futures||[]).filter(r=>r.expiry_rank===1);
 
-  _futData = data.near_month || [];
-
-  pg.innerHTML = `
+  pg.innerHTML=`
     <div class="filter-bar">
       <input id="fut-search" type="search" placeholder="Search symbol…">
       <select id="fut-signal">
@@ -1096,461 +973,269 @@ function renderFutures(data) {
     <div class="tbl-wrap">
       <table id="tbl-futures">
         <thead><tr>
-          <th>Symbol</th>
-          <th>LTP</th>
-          <th>Chg%</th>
-          <th>OI</th>
-          <th>OI Chg</th>
-          <th>Basis%</th>
-          <th>Conv</th>
-          <th>Sig</th>
+          <th>Symbol</th><th>LTP</th><th>Chg%</th>
+          <th>OI</th><th>OI Chg%</th><th>Basis%</th><th>Conv</th><th>Sig</th>
         </tr></thead>
         <tbody id="fut-tbody"></tbody>
       </table>
-    </div>
-  `;
-
-  const search = document.getElementById('fut-search');
-  const signal = document.getElementById('fut-signal');
-  const sort   = document.getElementById('fut-sort');
-
-  function applyFilters() {
-    const q  = search.value.trim().toUpperCase();
-    const sg = signal.value;
-    const so = sort.value;
-
-    let rows = _futData.filter(r =>
-      (!q  || r.symbol.includes(q)) &&
-      (!sg || r.signal === sg)
-    );
-
-    rows.sort((a,b) => {
-      switch(so) {
-        case 'price_desc': return parseFloat(b.price_chg||0) - parseFloat(a.price_chg||0);
-        case 'price_asc':  return parseFloat(a.price_chg||0) - parseFloat(b.price_chg||0);
-        case 'basis_desc': return parseFloat(b.basis_pct||0) - parseFloat(a.basis_pct||0);
-        case 'conv_desc':  return parseFloat(b.conv_score||0) - parseFloat(a.conv_score||0);
-        default:           return parseInt(b.oi||0) - parseInt(a.oi||0);
-      }
-    });
-    _futFiltered = rows;
-    renderFutureRows(rows);
-  }
-
-  search.addEventListener('input',  applyFilters);
-  signal.addEventListener('change', applyFilters);
-  sort.addEventListener('change',   applyFilters);
-  applyFilters();
-}
-
-function renderFutureRows(rows) {
-  const tbody = document.getElementById('fut-tbody');
-  const count = document.getElementById('fut-count');
-  if (!tbody) return;
-  count.textContent = `${rows.length} symbols`;
-
-  tbody.innerHTML = rows.map(r => {
-    const pc  = parseFloat(r.price_chg || 0);
-    const oi  = parseInt(r.oi || 0);
-    const oic = parseInt(r.oi_chg || 0);
-    const oicp = oi>0&&(oi-oic)>0 ? ((oic/(oi-oic))*100).toFixed(1) : '0.0';
-    const ltp  = parseFloat(r.ltp || 0);
-    return `
-      <tr class="${row_cls(r.signal)}" onclick='showFutureSheet(${JSON.stringify(r)})'>
-        <td>${ban_badge(r)}<strong>${r.symbol}</strong></td>
-        <td class="bold">₹${ltp>=10000?ltp.toFixed(0):ltp.toFixed(2)}</td>
-        <td class="${pc>=0?'up':'down'} bold">${pc>=0?'+':''}${pc.toFixed(2)}%</td>
-        <td>${fmt_oi(r.oi)}</td>
-        <td class="${parseFloat(oicp)>=0?'up':'down'}">${parseFloat(oicp)>=0?'+':''}${oicp}%</td>
-        <td class="${parseFloat(r.basis_pct||0)>=0?'up':'down'}">${parseFloat(r.basis_pct||0).toFixed(2)}%</td>
-        <td>${parseFloat(r.conv_score||0).toFixed(1)}</td>
-        <td>${sig_badge(r.signal)}</td>
-      </tr>`;
-  }).join('');
-}
-
-function showFutureSheet(r) {
-  if (typeof r === 'string') try { r = JSON.parse(r); } catch { return; }
-  const pc   = parseFloat(r.price_chg || 0);
-  const oi   = parseInt(r.oi || 0);
-  const oic  = parseInt(r.oi_chg || 0);
-  const oicp = oi>0&&(oi-oic)>0 ? ((oic/(oi-oic))*100).toFixed(2) : '0.00';
-
-  // Mini OI sparkline (last 6 days)
-  const hist = r.oi_history || [];
-  let spark = '';
-  if (hist.length > 1) {
-    const max = Math.max(...hist), min = Math.min(...hist);
-    const range = max - min || 1;
-    const pts = hist.map((v,i) => {
-      const x = (i / (hist.length-1)) * 80;
-      const y = 20 - ((v-min)/range)*18;
-      return `${x},${y}`;
-    }).join(' ');
-    const lastUp = hist[hist.length-1] >= hist[hist.length-2];
-    spark = `<div style="margin:8px 0 4px">
-      <div style="font-size:10px;color:var(--fg2);margin-bottom:4px">OI Trend (6d)</div>
-      <svg width="80" height="22" style="display:block">
-        <polyline points="${pts}" fill="none"
-          stroke="${lastUp?'#22c55e':'#ef4444'}" stroke-width="1.5"/>
-      </svg>
     </div>`;
+
+  function apply(){
+    const q=document.getElementById('fut-search').value.trim().toUpperCase();
+    const sg=document.getElementById('fut-signal').value;
+    const so=document.getElementById('fut-sort').value;
+    let rows=near.filter(r=>(!q||r.symbol.includes(q))&&(!sg||r.trend===sg));
+    rows.sort((a,b)=>{
+      if(so==='price_desc') return (b.chg_pct||0)-(a.chg_pct||0);
+      if(so==='price_asc')  return (a.chg_pct||0)-(b.chg_pct||0);
+      if(so==='basis_desc') return (b.basis_pct||0)-(a.basis_pct||0);
+      if(so==='conv_desc')  return (b.conv_score||0)-(a.conv_score||0);
+      return (b.oi||0)-(a.oi||0);
+    });
+    document.getElementById('fut-count').textContent=`${rows.length} symbols`;
+    document.getElementById('fut-tbody').innerHTML=rows.map(r=>{
+      const p=parseFloat(r.chg_pct||0),o=parseFloat(r.oi_chg_pct||0);
+      const l=parseFloat(r.ltp||0),bp=parseFloat(r.basis_pct||0);
+      return `<tr class="${row_cls(r.trend)}" onclick='showFutSheet(${JSON.stringify(r)})'>
+        <td>${ban_badge(r)}<strong>${r.symbol}</strong></td>
+        <td class="bold">₹${l>=10000?l.toFixed(0):l.toFixed(2)}</td>
+        <td class="${p>=0?'up':'down'} bold">${p>=0?'+':''}${p.toFixed(2)}%</td>
+        <td>${fmt_oi(r.oi)}</td>
+        <td class="${o>=0?'up':'down'}">${o>=0?'+':''}${o.toFixed(2)}%</td>
+        <td class="${bp>=0?'up':'down'}">${bp>=0?'+':''}${bp.toFixed(2)}%</td>
+        <td>${(r.conv_score||0).toFixed(1)}</td>
+        <td>${sig_badge(r.trend)}</td></tr>`;
+    }).join('');
   }
-
-  openSheet(`
-    ${spark}
-    <div class="sheet-row"><span class="lbl">LTP</span>
-      <span class="val bold">₹${parseFloat(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Spot</span>
-      <span class="val">₹${parseFloat(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Price Change</span>
-      <span class="val ${pc>=0?'up':'down'} bold">${pc>=0?'+':''}${pc.toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Open Interest</span>
-      <span class="val">${fmt_oi(r.oi)} lots</span></div>
-    <div class="sheet-row"><span class="lbl">OI Change</span>
-      <span class="val ${parseFloat(oicp)>=0?'up':'down'}">${parseFloat(oicp)>=0?'+':''}${oicp}%</span></div>
-    <div class="sheet-row"><span class="lbl">Basis</span>
-      <span class="val">₹${parseFloat(r.basis||0).toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">Basis%</span>
-      <span class="val ${parseFloat(r.basis_pct||0)>=0?'up':'down'}">${parseFloat(r.basis_pct||0).toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Fair Value</span>
-      <span class="val">₹${parseFloat(r.fair_value||0).toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">FV Diff</span>
-      <span class="val">${parseFloat(r.fv_diff||0).toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">Conv. Score</span>
-      <span class="val">${parseFloat(r.conv_score||0).toFixed(1)}</span></div>
-    <div class="sheet-row"><span class="lbl">Signal</span>
-      <span class="val">${sig_badge(r.signal)}</span></div>
-    <div class="sheet-row"><span class="lbl">Pattern</span>
-      <span class="val">${r.pattern||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">5d Price Chg%</span>
-      <span class="val">${parseFloat(r.price_5d_pct||0).toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">5d OI Chg%</span>
-      <span class="val">${parseFloat(r.oi_5d_pct||0).toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Days to Expiry</span>
-      <span class="val">${r.days_to_exp||'—'} (${r.expiry||''})</span></div>
-    <div class="sheet-row"><span class="lbl">Lot Size</span>
-      <span class="val">${r.lot||'—'}</span></div>
-    ${r.alerts ? `<div class="sheet-row"><span class="lbl">Alerts</span>
-      <span class="val">${r.alerts}</span></div>` : ''}
-  `, (r.ban_status==='ban'?'🚫 ':'')+r.symbol+' — Futures');
+  document.getElementById('fut-search').addEventListener('input',apply);
+  document.getElementById('fut-signal').addEventListener('change',apply);
+  document.getElementById('fut-sort').addEventListener('change',apply);
+  apply();
 }
-window.showFutureSheet = showFutureSheet;
-window.renderFutures   = renderFutures;
 
-/* ══════════════════════════════════════════════════════════════════════
-   oi.js — OI Analysis tab
-   ══════════════════════════════════════════════════════════════════════ */
+function showFutSheet(r){
+  if(typeof r==='string') try{r=JSON.parse(r);}catch{return;}
+  const p=parseFloat(r.chg_pct||0),o=parseFloat(r.oi_chg_pct||0),bp=parseFloat(r.basis_pct||0);
+  openSheet(`
+    <div class="sheet-row"><span class="lbl">LTP</span><span class="val bold">₹${(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
+    <div class="sheet-row"><span class="lbl">Spot</span><span class="val">₹${(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
+    <div class="sheet-row"><span class="lbl">Price Chg%</span><span class="val ${p>=0?'up':'down'} bold">${p>=0?'+':''}${p.toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">OI</span><span class="val">${fmt_oi(r.oi)} lots</span></div>
+    <div class="sheet-row"><span class="lbl">OI Chg%</span><span class="val ${o>=0?'up':'down'}">${o>=0?'+':''}${o.toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Basis</span><span class="val">₹${(r.basis||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">Basis%</span><span class="val ${bp>=0?'up':'down'}">${bp>=0?'+':''}${bp.toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Fair Value</span><span class="val">₹${(r.fair_value||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">Conv Score</span><span class="val">${(r.conv_score||0).toFixed(1)}</span></div>
+    <div class="sheet-row"><span class="lbl">Signal</span><span class="val">${sig_badge(r.trend)}</span></div>
+    <div class="sheet-row"><span class="lbl">Pattern</span><span class="val">${r.pattern||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Days to Exp</span><span class="val">${r.days_to_exp||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Expiry</span><span class="val">${r.expiry||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Lot Size</span><span class="val">${r.lot_size||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Volume</span><span class="val">${fmt_oi(r.volume)}</span></div>
+    ${r.alerts?`<div class="sheet-row"><span class="lbl">Alerts</span><span class="val">${r.alerts}</span></div>`:''}
+  `,(r.ban_status==='ban'?'🚫 ':'')+r.symbol+' — Futures');
+}
+window.showFutSheet=showFutSheet;
+window.renderFutures=renderFutures;
 
-let _oiScreen = 'movers'; // 'movers' | 'signals'
+/* oi.js — fixed for v3 snapshot */
+let _oiScreen='movers';
+function renderOI(data){
+  const pg=document.getElementById('page-oi');
+  if(!data||!pg) return;
+  const near=(data.futures||[]).filter(r=>r.expiry_rank===1);
+  // Build gainers/losers from near month sorted by oi_chg_pct
+  const withOi=near.filter(r=>r.oi>0);
+  const gainers=[...withOi].sort((a,b)=>(b.oi_chg_pct||0)-(a.oi_chg_pct||0)).slice(0,25);
+  const losers =[...withOi].sort((a,b)=>(a.oi_chg_pct||0)-(b.oi_chg_pct||0)).slice(0,25);
+  // Signal breakdown
+  const sb={LB:[],SB:[],LU:[],SC:[]};
+  near.forEach(r=>{if(r.trend&&sb[r.trend])sb[r.trend].push(r);});
 
-function renderOI(data) {
-  const pg = document.getElementById('page-oi');
-  if (!data || !pg) return;
-
-  const gainers = (data.oi_movers?.gainers || []).slice(0, 25);
-  const losers  = (data.oi_movers?.losers  || []).slice(0, 25);
-  const sb      = data.signal_breakdown || {};
-
-  pg.innerHTML = `
-    <!-- Screen toggle -->
+  pg.innerHTML=`
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <button id="oi-btn-movers" onclick="oiSwitch('movers')"
         style="flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;
-          font-size:12px;font-weight:700;background:var(--accent);color:#fff">
-        📊 OI Movers
-      </button>
+        font-size:12px;font-weight:700;background:var(--accent);color:#fff">📊 OI Movers</button>
       <button id="oi-btn-signals" onclick="oiSwitch('signals')"
         style="flex:1;padding:8px;border-radius:6px;border:none;cursor:pointer;
-          font-size:12px;font-weight:700;background:var(--panel);color:var(--fg2)">
-        🏷 Signal Breakdown
-      </button>
+        font-size:12px;font-weight:700;background:var(--panel);color:var(--fg2)">🏷 Signals</button>
     </div>
-
-    <!-- Screen 1: Movers -->
     <div id="oi-screen-movers">
       <div class="sec-head">🔥 Top 25 OI Gainers</div>
-      <div class="tbl-wrap">
-        <table id="tbl-gainers">
-          <thead><tr>
-            <th>Symbol</th><th>LTP</th><th>Chg%</th>
-            <th>OI</th><th>OI Chg%</th><th>Sig</th>
-          </tr></thead>
-          <tbody>
-            ${gainers.map(r => oiRow(r)).join('')}
-          </tbody>
-        </table>
-      </div>
-
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI</th><th>OI Chg%</th><th>Sig</th></tr></thead>
+        <tbody>${gainers.map(r=>oiRow(r)).join('')}</tbody>
+      </table></div>
       <div class="sec-head" style="margin-top:14px">❄️ Top 25 OI Losers</div>
-      <div class="tbl-wrap">
-        <table id="tbl-losers">
-          <thead><tr>
-            <th>Symbol</th><th>LTP</th><th>Chg%</th>
-            <th>OI</th><th>OI Chg%</th><th>Sig</th>
-          </tr></thead>
-          <tbody>
-            ${losers.map(r => oiRow(r)).join('')}
-          </tbody>
-        </table>
-      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI</th><th>OI Chg%</th><th>Sig</th></tr></thead>
+        <tbody>${losers.map(r=>oiRow(r)).join('')}</tbody>
+      </table></div>
     </div>
-
-    <!-- Screen 2: Signal Breakdown -->
     <div id="oi-screen-signals" style="display:none">
-      ${['LB','SB','LU','SC'].map(code => {
-        const items = (sb[code] || []).slice(0, 10);
-        const colors = {LB:'#22c55e',SB:'#ef4444',LU:'#f59e0b',SC:'#a855f7'};
-        const names  = {LB:'Long Buildup',SB:'Short Buildup',LU:'Long Unwinding',SC:'Short Covering'};
-        const descs  = {LB:'Price↑ OI↑',SB:'Price↓ OI↑',LU:'Price↓ OI↓',SC:'Price↑ OI↓'};
-        return `
-          <div class="card" style="border-color:${colors[code]}22;margin-bottom:10px">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-              <span class="sig sig-${code.toLowerCase()}" style="font-size:13px;padding:3px 8px">${code}</span>
-              <span style="font-size:13px;font-weight:700;color:${colors[code]}">${names[code]}</span>
-              <span style="margin-left:auto;font-size:20px;font-weight:700;color:${colors[code]}">${items.length}</span>
-            </div>
-            <div style="font-size:10px;color:var(--fg2);margin-bottom:8px">${descs[code]}</div>
-            ${items.length ? `
-            <div class="tbl-wrap">
-              <table>
-                <thead><tr>
-                  <th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI</th><th>OI Chg%</th>
-                </tr></thead>
-                <tbody>
-                  ${items.map(r => oiRow(r, true)).join('')}
-                </tbody>
-              </table>
-            </div>` : '<div style="color:var(--fg2);font-size:12px;padding:6px">No signals</div>'}
-          </div>`;
+      ${['LB','SB','LU','SC'].map(code=>{
+        const items=sb[code].slice(0,10);
+        const cols={LB:'#22c55e',SB:'#ef4444',LU:'#f59e0b',SC:'#a855f7'};
+        const names={LB:'Long Buildup',SB:'Short Buildup',LU:'Long Unwinding',SC:'Short Covering'};
+        const descs={LB:'Price↑ OI↑',SB:'Price↓ OI↑',LU:'Price↓ OI↓',SC:'Price↑ OI↓'};
+        return `<div class="card" style="border-color:${cols[code]}22;margin-bottom:10px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span class="sig sig-${code.toLowerCase()}" style="font-size:13px;padding:3px 8px">${code}</span>
+            <span style="font-size:13px;font-weight:700;color:${cols[code]}">${names[code]}</span>
+            <span style="margin-left:auto;font-size:22px;font-weight:700;color:${cols[code]}">${items.length}</span>
+          </div>
+          <div style="font-size:10px;color:var(--fg2);margin-bottom:8px">${descs[code]}</div>
+          ${items.length?`<div class="tbl-wrap"><table>
+            <thead><tr><th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI Chg%</th></tr></thead>
+            <tbody>${items.map(r=>`<tr class="${row_cls(r.trend)}" onclick='showFutSheet(${JSON.stringify(r)})'>
+              <td><strong>${r.symbol}</strong></td>
+              <td>₹${(r.ltp||0).toFixed(2)}</td>
+              <td class="${(r.chg_pct||0)>=0?'up':'down'}">${(r.chg_pct||0)>=0?'+':''}${(r.chg_pct||0).toFixed(2)}%</td>
+              <td class="${(r.oi_chg_pct||0)>=0?'up':'down'}">${(r.oi_chg_pct||0)>=0?'+':''}${(r.oi_chg_pct||0).toFixed(2)}%</td>
+            </tr>`).join('')}</tbody>
+          </table></div>`:'<div style="color:var(--fg2);font-size:12px;padding:6px">No signals</div>'}
+        </div>`;
       }).join('')}
-    </div>
-  `;
-
+    </div>`;
   oiSwitch(_oiScreen);
 }
-
-function oiRow(r, compact = false) {
-  const pc  = parseFloat(r.price_chg || 0);
-  const oi  = parseInt(r.oi || 0);
-  const oic = parseInt(r.oi_chg || 0);
-  const oicp = oi>0&&(oi-oic)>0 ? ((oic/(oi-oic))*100).toFixed(1) : '0.0';
-  const ltp  = parseFloat(r.ltp || 0);
-  return `
-    <tr class="${row_cls(r.signal)}" onclick='showSymbolSheet(${JSON.stringify(r)})'>
-      <td>${ban_badge(r)}<strong>${r.symbol}</strong></td>
-      <td>₹${ltp>=10000?ltp.toFixed(0):ltp.toFixed(2)}</td>
-      <td class="${pc>=0?'up':'down'}">${pc>=0?'+':''}${pc.toFixed(2)}%</td>
-      <td>${fmt_oi(r.oi)}</td>
-      <td class="${parseFloat(oicp)>=0?'up':'down'}">${parseFloat(oicp)>=0?'+':''}${oicp}%</td>
-      ${compact ? '' : `<td>${sig_badge(r.signal)}</td>`}
-    </tr>`;
+function oiRow(r){
+  const p=parseFloat(r.chg_pct||0),o=parseFloat(r.oi_chg_pct||0),l=parseFloat(r.ltp||0);
+  return `<tr class="${row_cls(r.trend)}" onclick='showFutSheet(${JSON.stringify(r)})'>
+    <td>${ban_badge(r)}<strong>${r.symbol}</strong></td>
+    <td>₹${l>=10000?l.toFixed(0):l.toFixed(2)}</td>
+    <td class="${p>=0?'up':'down'}">${p>=0?'+':''}${p.toFixed(2)}%</td>
+    <td>${fmt_oi(r.oi)}</td>
+    <td class="${o>=0?'up':'down'} bold">${o>=0?'+':''}${o.toFixed(2)}%</td>
+    <td>${sig_badge(r.trend)}</td></tr>`;
 }
-
-function oiSwitch(screen) {
-  _oiScreen = screen;
-  const m  = document.getElementById('oi-screen-movers');
-  const s  = document.getElementById('oi-screen-signals');
-  const bm = document.getElementById('oi-btn-movers');
-  const bs = document.getElementById('oi-btn-signals');
-  if (!m || !s) return;
-  if (screen === 'movers') {
-    m.style.display = 'block'; s.style.display = 'none';
-    if (bm) { bm.style.background='var(--accent)'; bm.style.color='#fff'; }
-    if (bs) { bs.style.background='var(--panel)';  bs.style.color='var(--fg2)'; }
-  } else {
-    m.style.display = 'none'; s.style.display = 'block';
-    if (bs) { bs.style.background='var(--accent)'; bs.style.color='#fff'; }
-    if (bm) { bm.style.background='var(--panel)';  bm.style.color='var(--fg2)'; }
+function oiSwitch(s){
+  _oiScreen=s;
+  const m=document.getElementById('oi-screen-movers');
+  const sg=document.getElementById('oi-screen-signals');
+  const bm=document.getElementById('oi-btn-movers');
+  const bs=document.getElementById('oi-btn-signals');
+  if(!m||!sg) return;
+  if(s==='movers'){
+    m.style.display='block';sg.style.display='none';
+    if(bm){bm.style.background='var(--accent)';bm.style.color='#fff';}
+    if(bs){bs.style.background='var(--panel)';bs.style.color='var(--fg2)';}
+  }else{
+    m.style.display='none';sg.style.display='block';
+    if(bs){bs.style.background='var(--accent)';bs.style.color='#fff';}
+    if(bm){bm.style.background='var(--panel)';bm.style.color='var(--fg2)';}
   }
 }
+window.oiSwitch=oiSwitch;
+window.renderOI=renderOI;
 
-window.oiSwitch  = oiSwitch;
-window.renderOI  = renderOI;
+/* rollover.js — fixed for v3 snapshot */
+function renderRollover(data){
+  const pg=document.getElementById('page-rollover');
+  if(!data||!pg) return;
+  const rv=data.rollover||{};
+  const rows=rv.symbols||[];
+  const mktPct=rv.market_rollover_pct||0;
 
-/* ══════════════════════════════════════════════════════════════════════
-   rollover.js — Rollover tab
-   ══════════════════════════════════════════════════════════════════════ */
-
-function renderRollover(data) {
-  const pg = document.getElementById('page-rollover');
-  if (!data || !pg) return;
-
-  const rows = data.rollover || [];
-  if (!rows.length) {
-    pg.innerHTML = '<div class="error-state"><div class="err-icon">📭</div><div>No rollover data available</div></div>';
+  if(!rows.length){
+    pg.innerHTML='<div class="error-state"><div class="err-icon">📭</div><div>No rollover data</div></div>';
     return;
   }
-
-  // Market-wide rollover%
-  const totalNear = rows.reduce((s,r) => s + parseInt(r.oi_near||0), 0);
-  const totalNext = rows.reduce((s,r) => s + parseInt(r.oi_next||0), 0);
-  const mktRoll   = totalNear+totalNext > 0
-    ? (totalNext/(totalNear+totalNext)*100).toFixed(1) : '—';
-
-  pg.innerHTML = `
-    <!-- Market rollover gauge -->
+  pg.innerHTML=`
     <div class="card" style="text-align:center;margin-bottom:12px">
       <div class="card-title">Market Rollover %</div>
-      <div style="font-size:48px;font-weight:700;color:var(--accent);line-height:1">${mktRoll}%</div>
-      <div style="font-size:11px;color:var(--fg2);margin-top:4px">
-        Near OI: ${fmt_oi(totalNear)} · Next OI: ${fmt_oi(totalNext)}
-      </div>
-      <!-- Arc gauge using CSS -->
+      <div style="font-size:48px;font-weight:700;color:var(--accent);line-height:1">${Number(mktPct).toFixed(1)}%</div>
+      <div style="font-size:11px;color:var(--fg2);margin-top:6px">${rows.length} symbols tracked</div>
       <div style="margin:12px auto;width:160px;height:80px;position:relative;overflow:hidden">
         <div style="position:absolute;bottom:0;left:0;width:160px;height:160px;
           border-radius:50%;border:12px solid var(--border);clip-path:inset(0 0 50% 0)"></div>
         <div style="position:absolute;bottom:0;left:0;width:160px;height:160px;
           border-radius:50%;border:12px solid var(--accent);clip-path:inset(0 0 50% 0);
-          transform:rotate(${mktRoll*1.8-180}deg);transform-origin:50% 100%;
+          transform:rotate(${Math.min(mktPct,100)*1.8-180}deg);transform-origin:50% 100%;
           transition:transform 0.5s ease"></div>
-        <div style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);
-          font-size:11px;color:var(--fg2)">${mktRoll}%</div>
       </div>
     </div>
-
-    <!-- Filter bar -->
     <div class="filter-bar">
       <input id="ro-search" type="search" placeholder="Search symbol…">
-      <select id="ro-bias">
-        <option value="">All Signals</option>
-        <option value="LB">Long Buildup</option>
-        <option value="SB">Short Buildup</option>
-        <option value="LU">Long Unwinding</option>
-        <option value="SC">Short Covering</option>
-      </select>
       <select id="ro-sort">
         <option value="roll_desc">Roll% ↓</option>
         <option value="roll_asc">Roll% ↑</option>
         <option value="oi_desc">OI ↓</option>
       </select>
     </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Symbol</th><th>Roll%</th><th>Near OI</th><th>Next OI</th><th>CoC%</th><th>Bias</th></tr></thead>
+      <tbody id="ro-tbody"></tbody>
+    </table></div>`;
 
-    <div class="tbl-wrap">
-      <table id="tbl-rollover">
-        <thead><tr>
-          <th>Symbol</th>
-          <th>Roll%</th>
-          <th>Near OI</th>
-          <th>Next OI</th>
-          <th>CoC%</th>
-          <th>Sig</th>
-        </tr></thead>
-        <tbody id="ro-tbody"></tbody>
-      </table>
-    </div>
-  `;
-
-  const search = document.getElementById('ro-search');
-  const bias   = document.getElementById('ro-bias');
-  const sort   = document.getElementById('ro-sort');
-
-  function apply() {
-    const q  = search.value.trim().toUpperCase();
-    const sg = bias.value;
-    const so = sort.value;
-    let list = rows.filter(r =>
-      (!q  || (r.symbol||'').includes(q)) &&
-      (!sg || r.near_signal === sg)
-    );
-    list.sort((a,b) => {
-      switch(so) {
-        case 'roll_asc':  return parseFloat(a.rollover_pct||0) - parseFloat(b.rollover_pct||0);
-        case 'oi_desc':   return parseInt(b.oi_near||0) - parseInt(a.oi_near||0);
-        default:          return parseFloat(b.rollover_pct||0) - parseFloat(a.rollover_pct||0);
-      }
+  function apply(){
+    const q=document.getElementById('ro-search').value.trim().toUpperCase();
+    const so=document.getElementById('ro-sort').value;
+    let list=rows.filter(r=>!q||(r.symbol||'').includes(q));
+    list.sort((a,b)=>{
+      if(so==='roll_asc') return (a.rollover_pct||0)-(b.rollover_pct||0);
+      if(so==='oi_desc')  return (b.oi_near||0)-(a.oi_near||0);
+      return (b.rollover_pct||0)-(a.rollover_pct||0);
     });
-    renderRolloverRows(list);
-  }
-
-  search.addEventListener('input',  apply);
-  bias.addEventListener('change',   apply);
-  sort.addEventListener('change',   apply);
-  apply();
-}
-
-function renderRolloverRows(rows) {
-  const tbody = document.getElementById('ro-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = rows.map(r => {
-    const rp  = parseFloat(r.rollover_pct || 0);
-    const coc = parseFloat(r.cost_of_carry || 0);
-    const fillW = Math.min(rp, 100).toFixed(1);
-    const fillC = rp >= 70 ? '#22c55e' : rp >= 40 ? '#1a7abf' : '#f59e0b';
-    return `
-      <tr class="${row_cls(r.near_signal)}" onclick='showRolloverSheet(${JSON.stringify(r)})'>
+    document.getElementById('ro-tbody').innerHTML=list.map(r=>{
+      const rp=parseFloat(r.rollover_pct||0);
+      const coc=parseFloat(r.cost_of_carry||0);
+      const fc=rp>=70?'#22c55e':rp>=40?'#1a7abf':'#f59e0b';
+      return `<tr onclick='showRollSheet(${JSON.stringify(r)})'>
         <td><strong>${r.symbol}</strong></td>
-        <td>
-          <div style="font-weight:700">${rp.toFixed(1)}%</div>
-          <div class="roll-bar"><div class="roll-fill" style="width:${fillW}%;background:${fillC}"></div></div>
-        </td>
+        <td><div style="font-weight:700">${rp.toFixed(1)}%</div>
+          <div class="roll-bar"><div class="roll-fill" style="width:${Math.min(rp,100).toFixed(1)}%;background:${fc}"></div></div></td>
         <td>${fmt_oi(r.oi_near)}</td>
         <td>${fmt_oi(r.oi_next)}</td>
         <td class="${coc>=0?'up':'down'}">${coc>=0?'+':''}${coc.toFixed(2)}%</td>
-        <td>${sig_badge(r.near_signal)}</td>
-      </tr>`;
-  }).join('');
+        <td>${r.bias||'—'}</td></tr>`;
+    }).join('');
+  }
+  document.getElementById('ro-search').addEventListener('input',apply);
+  document.getElementById('ro-sort').addEventListener('change',apply);
+  apply();
 }
-
-function showRolloverSheet(r) {
-  if (typeof r === 'string') try { r = JSON.parse(r); } catch { return; }
-  const rp = parseFloat(r.rollover_pct || 0);
+function showRollSheet(r){
+  if(typeof r==='string') try{r=JSON.parse(r);}catch{return;}
   openSheet(`
-    <div class="sheet-row"><span class="lbl">Rollover %</span>
-      <span class="val bold" style="font-size:20px">${rp.toFixed(1)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Near OI</span>
-      <span class="val">${fmt_oi(r.oi_near)} lots</span></div>
-    <div class="sheet-row"><span class="lbl">Next OI</span>
-      <span class="val">${fmt_oi(r.oi_next)} lots</span></div>
-    <div class="sheet-row"><span class="lbl">Near Expiry</span>
-      <span class="val">${r.near_expiry||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Next Expiry</span>
-      <span class="val">${r.next_expiry||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Cost of Carry</span>
-      <span class="val ${parseFloat(r.cost_of_carry||0)>=0?'up':'down'}">${parseFloat(r.cost_of_carry||0).toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Near Signal</span>
-      <span class="val">${sig_badge(r.near_signal)}</span></div>
-    <div class="sheet-row"><span class="lbl">Mid Signal</span>
-      <span class="val">${sig_badge(r.mid_signal)}</span></div>
-  `, r.symbol + ' — Rollover');
+    <div class="sheet-row"><span class="lbl">Rollover %</span><span class="val bold" style="font-size:22px">${(r.rollover_pct||0).toFixed(1)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Near OI</span><span class="val">${fmt_oi(r.oi_near)} lots</span></div>
+    <div class="sheet-row"><span class="lbl">Next OI</span><span class="val">${fmt_oi(r.oi_next)} lots</span></div>
+    <div class="sheet-row"><span class="lbl">Near Expiry</span><span class="val">${r.expiry_near||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Next Expiry</span><span class="val">${r.expiry_next||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Cost of Carry</span><span class="val ${(r.cost_of_carry||0)>=0?'up':'down'}">${(r.cost_of_carry||0).toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Bias</span><span class="val">${r.bias||'—'}</span></div>
+  `,r.symbol+' — Rollover');
 }
+window.showRollSheet=showRollSheet;
+window.renderRollover=renderRollover;
 
-window.showRolloverSheet = showRolloverSheet;
-window.renderRollover    = renderRollover;
+/* basis.js — fixed for v3 snapshot */
+function renderBasis(data){
+  const pg=document.getElementById('page-basis');
+  if(!data||!pg) return;
+  // basis data lives in futures array
+  const rows=(data.futures||[]).filter(r=>r.expiry_rank===1&&r.spot>0);
+  const premium =rows.filter(r=>(r.basis_pct||0)> 0.5).length;
+  const discount=rows.filter(r=>(r.basis_pct||0)<-0.5).length;
+  const parity  =rows.length-premium-discount;
 
-/* ══════════════════════════════════════════════════════════════════════
-   basis.js — Basis Analysis tab
-   ══════════════════════════════════════════════════════════════════════ */
-
-function renderBasis(data) {
-  const pg = document.getElementById('page-basis');
-  if (!data || !pg) return;
-
-  const rows = data.basis_summary || [];
-
-  // Stats
-  const premium  = rows.filter(r => parseFloat(r.basis_pct||0) >  0.5).length;
-  const discount = rows.filter(r => parseFloat(r.basis_pct||0) < -0.5).length;
-  const parity   = rows.length - premium - discount;
-
-  pg.innerHTML = `
-    <!-- Summary pills -->
+  pg.innerHTML=`
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <div class="card" style="flex:1;text-align:center;padding:8px;border-color:#064e1a">
-        <div style="font-size:20px;font-weight:700;color:var(--green)">${premium}</div>
+        <div style="font-size:22px;font-weight:700;color:var(--green)">${premium}</div>
         <div style="font-size:10px;color:var(--fg2)">Premium</div>
       </div>
       <div class="card" style="flex:1;text-align:center;padding:8px">
-        <div style="font-size:20px;font-weight:700;color:var(--fg2)">${parity}</div>
+        <div style="font-size:22px;font-weight:700;color:var(--fg2)">${parity}</div>
         <div style="font-size:10px;color:var(--fg2)">Parity</div>
       </div>
       <div class="card" style="flex:1;text-align:center;padding:8px;border-color:#4e0606">
-        <div style="font-size:20px;font-weight:700;color:var(--red)">${discount}</div>
+        <div style="font-size:22px;font-weight:700;color:var(--red)">${discount}</div>
         <div style="font-size:10px;color:var(--fg2)">Discount</div>
       </div>
     </div>
-
-    <!-- Filter bar -->
     <div class="filter-bar">
       <input id="ba-search" type="search" placeholder="Search symbol…">
       <select id="ba-filter">
@@ -1562,118 +1247,73 @@ function renderBasis(data) {
         <option value="basis_desc">Basis% ↓</option>
         <option value="basis_asc">Basis% ↑</option>
         <option value="conv_desc">Conv ↓</option>
+        <option value="oi_desc">OI ↓</option>
       </select>
     </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th>Symbol</th><th>Spot</th><th>LTP</th>
+        <th>Basis%</th><th>FV</th><th>Conv</th><th>Sig</th>
+      </tr></thead>
+      <tbody id="ba-tbody"></tbody>
+    </table></div>`;
 
-    <div class="tbl-wrap">
-      <table id="tbl-basis">
-        <thead><tr>
-          <th>Symbol</th>
-          <th>Spot</th>
-          <th>Fut LTP</th>
-          <th>Basis%</th>
-          <th>FV</th>
-          <th>FV Diff</th>
-          <th>Conv</th>
-          <th>Sig</th>
-        </tr></thead>
-        <tbody id="ba-tbody"></tbody>
-      </table>
-    </div>
-  `;
-
-  const search = document.getElementById('ba-search');
-  const filter = document.getElementById('ba-filter');
-  const sort   = document.getElementById('ba-sort');
-
-  function apply() {
-    const q  = search.value.trim().toUpperCase();
-    const f  = filter.value;
-    const so = sort.value;
-    let list = rows.filter(r => {
-      if (q && !(r.symbol||'').includes(q)) return false;
-      const bp = parseFloat(r.basis_pct||0);
-      if (f === 'premium'  && bp <= 0.5)  return false;
-      if (f === 'discount' && bp >= -0.5) return false;
+  function apply(){
+    const q=document.getElementById('ba-search').value.trim().toUpperCase();
+    const f=document.getElementById('ba-filter').value;
+    const so=document.getElementById('ba-sort').value;
+    let list=rows.filter(r=>{
+      if(q&&!r.symbol.includes(q)) return false;
+      const bp=r.basis_pct||0;
+      if(f==='premium'&&bp<=0.5) return false;
+      if(f==='discount'&&bp>=-0.5) return false;
       return true;
     });
-    list.sort((a,b) => {
-      switch(so) {
-        case 'basis_asc':  return parseFloat(a.basis_pct||0) - parseFloat(b.basis_pct||0);
-        case 'conv_desc':  return parseFloat(b.conv_score||0) - parseFloat(a.conv_score||0);
-        default:           return parseFloat(b.basis_pct||0) - parseFloat(a.basis_pct||0);
-      }
+    list.sort((a,b)=>{
+      if(so==='basis_asc') return (a.basis_pct||0)-(b.basis_pct||0);
+      if(so==='conv_desc') return (b.conv_score||0)-(a.conv_score||0);
+      if(so==='oi_desc')   return (b.oi||0)-(a.oi||0);
+      return (b.basis_pct||0)-(a.basis_pct||0);
     });
-    renderBasisRows(list);
+    document.getElementById('ba-tbody').innerHTML=list.map(r=>{
+      const bp=parseFloat(r.basis_pct||0);
+      let bpCls='neu';
+      if(bp>1) bpCls='up bold'; else if(bp<-1) bpCls='down bold';
+      else if(bp>0.3) bpCls='up'; else if(bp<-0.3) bpCls='down';
+      return `<tr class="${row_cls(r.trend)}" onclick='showBasisSheet(${JSON.stringify(r)})'>
+        <td><strong>${r.symbol}</strong></td>
+        <td>₹${(r.spot||0).toFixed(2)}</td>
+        <td>₹${(r.ltp||0).toFixed(2)}</td>
+        <td class="${bpCls}">${bp>=0?'+':''}${bp.toFixed(2)}%</td>
+        <td>₹${(r.fair_value||0).toFixed(2)}</td>
+        <td>${(r.conv_score||0).toFixed(1)}</td>
+        <td>${sig_badge(r.trend)}</td></tr>`;
+    }).join('');
   }
-
-  search.addEventListener('input',  apply);
-  filter.addEventListener('change', apply);
-  sort.addEventListener('change',   apply);
+  document.getElementById('ba-search').addEventListener('input',apply);
+  document.getElementById('ba-filter').addEventListener('change',apply);
+  document.getElementById('ba-sort').addEventListener('change',apply);
   apply();
 }
-
-function renderBasisRows(rows) {
-  const tbody = document.getElementById('ba-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = rows.map(r => {
-    const bp   = parseFloat(r.basis_pct || 0);
-    const fvd  = parseFloat(r.fv_diff || 0);
-    const conv = parseFloat(r.conv_score || 0);
-    const sig  = r.signal || '';
-    // Basis colour
-    let bpCls = 'neu';
-    if (bp >  1.0) bpCls = 'up bold';
-    else if (bp < -1.0) bpCls = 'down bold';
-    else if (bp >  0.3) bpCls = 'up';
-    else if (bp < -0.3) bpCls = 'down';
-
-    return `
-      <tr class="${row_cls(sig)}" onclick='showBasisSheet(${JSON.stringify(r)})'>
-        <td><strong>${r.symbol}</strong></td>
-        <td>₹${parseFloat(r.spot||0).toFixed(2)}</td>
-        <td>₹${parseFloat(r.ltp||0).toFixed(2)}</td>
-        <td class="${bpCls}">${bp>=0?'+':''}${bp.toFixed(2)}%</td>
-        <td>₹${parseFloat(r.fair_value||0).toFixed(2)}</td>
-        <td class="${fvd>=0?'up':'down'}">${fvd>=0?'+':''}${fvd.toFixed(2)}</td>
-        <td>${conv.toFixed(1)}</td>
-        <td>${sig_badge(sig)}</td>
-      </tr>`;
-  }).join('');
-}
-
-function showBasisSheet(r) {
-  if (typeof r === 'string') try { r = JSON.parse(r); } catch { return; }
-  const bp  = parseFloat(r.basis_pct || 0);
-  const fvd = parseFloat(r.fv_diff || 0);
+function showBasisSheet(r){
+  if(typeof r==='string') try{r=JSON.parse(r);}catch{return;}
+  const bp=parseFloat(r.basis_pct||0),fvd=parseFloat(r.fv_diff||0);
   openSheet(`
-    <div class="sheet-row"><span class="lbl">Spot Price</span>
-      <span class="val bold">₹${parseFloat(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Futures LTP</span>
-      <span class="val bold">₹${parseFloat(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Basis</span>
-      <span class="val">₹${parseFloat(r.basis||0).toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">Basis %</span>
-      <span class="val ${bp>=0?'up':'down'} bold">${bp>=0?'+':''}${bp.toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Fair Value</span>
-      <span class="val">₹${parseFloat(r.fair_value||0).toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">FV Diff</span>
-      <span class="val ${fvd>=0?'up':'down'}">${fvd>=0?'+':''}${fvd.toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">Conv Score</span>
-      <span class="val">${parseFloat(r.conv_score||0).toFixed(1)}</span></div>
-    <div class="sheet-row"><span class="lbl">Signal</span>
-      <span class="val">${sig_badge(r.signal)}</span></div>
-    <div class="sheet-row"><span class="lbl">Pattern</span>
-      <span class="val">${r.pattern||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Days to Expiry</span>
-      <span class="val">${r.days_to_exp||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Expiry</span>
-      <span class="val">${r.expiry||'—'}</span></div>
-  `, r.symbol + ' — Basis');
+    <div class="sheet-row"><span class="lbl">Spot</span><span class="val bold">₹${(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
+    <div class="sheet-row"><span class="lbl">Futures LTP</span><span class="val bold">₹${(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
+    <div class="sheet-row"><span class="lbl">Basis</span><span class="val">₹${(r.basis||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">Basis %</span><span class="val ${bp>=0?'up':'down'} bold">${bp>=0?'+':''}${bp.toFixed(2)}%</span></div>
+    <div class="sheet-row"><span class="lbl">Fair Value</span><span class="val">₹${(r.fair_value||0).toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">FV Diff</span><span class="val ${fvd>=0?'up':'down'}">${fvd>=0?'+':''}${fvd.toFixed(2)}</span></div>
+    <div class="sheet-row"><span class="lbl">Conv Score</span><span class="val">${(r.conv_score||0).toFixed(1)}</span></div>
+    <div class="sheet-row"><span class="lbl">Signal</span><span class="val">${sig_badge(r.trend)}</span></div>
+    <div class="sheet-row"><span class="lbl">Pattern</span><span class="val">${r.pattern||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Days to Exp</span><span class="val">${r.days_to_exp||'—'}</span></div>
+    <div class="sheet-row"><span class="lbl">Expiry</span><span class="val">${r.expiry||'—'}</span></div>
+  `,r.symbol+' — Basis');
 }
-
-window.showBasisSheet = showBasisSheet;
-window.renderBasis    = renderBasis;
+window.showBasisSheet=showBasisSheet;
+window.renderBasis=renderBasis;
 
   </script>
 </body>
