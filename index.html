@@ -1,441 +1,3 @@
-
-Claude finished the response
-
-index.html
-html
-
-PROJECT: NSE F&O Tracker v3.0 — SDK Fintech
-What's been built (Sessions 1–PWA):
-Desktop App (desktop_app_v3.py) — Python/Tkinter, 5093 lines. All patches applied via sequential patch files (session2 through session2h + fix_warn). Key features added:
-
-snapshot_builder.py — builds full JSON snapshot from live app
-github_pusher.py — pushes snapshot to GitHub with SHA handling, auto-resolves owner from token
-config_manager_v3.py — updated with export/PWA keys
-Heatmap: composite score (price×0.5 + OI×0.5), top-10 tiles 2× height, full-width, 3 filter modes
-Row colours restored: LB=green bold, SB=red bold, LU=amber, SC=purple, IDX=blue
-OI Analysis: dual-screen (OI Movers + Signal Breakdown)
-CSV Export on all tabs
-Auto-load options bhavcopy on startup
-Options screener: fixed "No Symbols" error, uses analysis_rows as fallback
-GitHub repo: capavankumarjagiasi/FO_Tracker_V3
-
-fo_snapshot_v3.json pushed automatically by desktop app after each data load
-GitHub Pages enabled at https://capavankumarjagiasi.github.io/FO_Tracker_V3/
-PWA (index.html) — Single-file, 56.6 KB, no external dependencies.
-
-5 tabs: 📊 Pulse | 📈 Futures | 🔥 OI | 🔄 Rollover | ⚖️ Basis
-Data URL: ./fo_snapshot_v3.json (relative, same-origin, no CORS)
-Field mappings fixed for v3 snapshot: chg_pct, oi_chg_pct, expiry_rank, trend, lot_size
-Dark/light theme, swipe nav, pull-to-refresh, offline cache, bottom sheet details
-Snapshot structure (v3 format):
-meta, market_summary, futures[], options_summary,
-strategy_scanner, options_screener, rollover{market_rollover_pct, symbols[]},
-market_pulse{sectors[], heatmap[]}, watchlist[], alerts[]
-Key field names: symbol, ltp, chg_pct, oi, oi_chg, oi_chg_pct, basis, basis_pct, fair_value, conv_score, trend, pattern, expiry, expiry_rank, lot_size, days_to_exp, spot, ban_status
-Pending / Known issues:
-
-PWA just updated — needs verification that data loads with new index.html
-Options Screener Failed:214 — NSE Live API returns empty outside market hours; bhavcopy options need Load Options button clicked (auto-load implemented but depends on op*.csv folder)
-Session 3 (PWA) tabs not yet built: Strategy Scanner and Options Screener tabs in PWA
-GitHub repo config: github_repo should be capavankumarjagiasi/FO_Tracker_V3 (with username) in Settings tab
-fpdf/pypdf conflict warning on startup — run: pip uninstall pypdf && pip install --upgrade fpdf2
-Files in G:\FO_Tracker_v3\:
-desktop_app_v3.py          ← main app (all patches applied)
-snapshot_builder.py        ← Session 1
-github_pusher.py           ← Session 1 (updated: _resolve_owner)
-config_manager_v3.py       ← Session 1
-options_screener.py        ← fixed: NSE API, symbol auto-populate
-fo_sectors.csv             ← sector mapping
-config_v3.json             ← github_repo needs username/ prefix
-Next sessions to complete:
-
-Session 3 — PWA: add Strategy Scanner tab + Options Screener tab to PWA
-Session 4 — Options Chain tab in PWA (if options_summary populated)
-Session 5 — PWA Watchlist + Alerts tab
-Session 6 — PWA polish: install prompt, share button, notification badge What inputs you need please inform me first so that i upload same. at present find latest PWA file.
-Show more
-Jun 23
-I can see the uploaded index.html (your current PWA). Let me read it thoroughly before planning Session 3.
-
-
-Reading the current PWA index.html
-Reading the current PWA index.html
-Let me view the truncated middle section:
-
-
-Viewed 2 files
-Viewed 2 files
-I now have a complete picture of the current PWA. Let me build Session 3 — adding Strategy Scanner and Options Screener tabs.
-
-
-Copy uploaded file to working directory
-Copy uploaded file to working directory
-Now I'll make all the targeted edits — adding 2 new tabs surgically into the existing file:
-
-
-Edited 5 files
-Edited 5 files
-Now add the CSS for the new tabs and the full JS for both new tabs, just before the closing </script> tag:
-
-
-Add tabbar overflow scroll CSS for 7 tabs
-Add tabbar overflow scroll CSS for 7 tabs
-Now insert the Strategy Scanner and Options Screener JS before the closing </script>:
-
-
-Insert Strategy Scanner and Options Screener JS modules before closing script tag
-Insert Strategy Scanner and Options Screener JS modules before closing script tag
-CONTINUE
-
-Jun 23
-Let me verify the current state of the file and check for any issues:
-
-
-Ran 7 commands
-Ran 7 commands
-All clean. Copy to output:
-
-
-Ran a command, read a file
-Ran a command, read a file
-Session 3 complete. Here's what was added:
-
-✅ Session 3 Deliverables
-🎯 Strategy Scanner tab (page-scanner)
-
-Summary strip: Bullish / Neutral / Bearish count at a glance
-Cards with: Symbol, Strategy name, Direction badge, Confidence % bar, Entry / Target / SL / R:R / Days-to-exp / Lot size
-Color-coded confidence fill bar (green ≥70%, amber ≥45%)
-Filters: Symbol search · Direction · Sort by Conf% / R:R / Symbol A–Z
-Smart fallback: if strategy_scanner[] is absent in snapshot, derives virtual cards from futures[] near-expiry using trend + price/OI signals
-Bottom sheet on tap: full greeks, pattern, basis%, conv score
-🔎 Options Screener tab (page-screener)
-
-PCR / Avg IV / Opportunity count summary strip (always visible even if rows empty)
-Graceful empty state with exact hint: "Click Load Options in desktop app"
-Table: Symbol · CE/PE · Strike · LTP · IV% · OI · OI Chg% · Signal badge
-Filters: Symbol search · CE/PE toggle · Signal (LB/SB/LU/SC) · Sort by OI/OI Chg%/IV/Volume/Theta
-Clickable rows → bottom sheet with full greeks (Delta, Theta, Vega), premium%, spot price
-Navigation
-
-Tab bar scrolls horizontally (overflow-x: auto, no scrollbar visible) to fit all 7 tabs cleanly on mobile
-Swipe left/right works across all 7 tabs
-HTML structure validated ✅ · JS syntax validated ✅ · 78.4 KB
-📋 Next Sessions Ready
-Session	Tab	Key data needed
-4	Options Chain	options_summary.chain[] populated
-5	Watchlist + Alerts	watchlist[], alerts[] in snapshot
-6	PWA polish	Install prompt, share, notification badge
-Upload the updated index.html to replace the GitHub Pages file — no other changes needed.
-
-
-Index
-Code · HTML 
-
-strategy_scanner.py
-py
-
-
-snapshot_builder.py
-py
-
-
-options_screener.py
-py
-
-
-github_pusher.py
-py
-
-
-fo_parser_v3.py
-py
-
-
-desktop_app_v3.py
-py
-
-
-fo_sectors.csv
-csv
-
-
-fo_snapshotv3.json
-json
-
-
-config_manager_v3.py
-220 lines
-
-py
-
-ALL NECESSARY FILES ATTACHED
-
-11:33 AM
-Let me read all the uploaded files thoroughly before making any changes.
-
-
-Viewed 5 files, ran a command
-Viewed 5 files, ran a command
-Now I have a complete picture. Let me look at the actual snapshot JSON to understand the exact structure being produced:
-
-
-Ran 2 commands
-Ran 2 commands
-Now I have the complete picture. The actual snapshot uses a completely different schema than what snapshot_builder.py produces. The live snapshot is from the older desktop app format. I need to:
-
-Fix the PWA to read the actual snapshot schema (futures_tracker, near_month, signal_breakdown, rollover, basis_summary, oi_movers, ban_list)
-Add Strategy Scanner derived from signal_breakdown + futures_tracker using the real strategy_scanner.py scoring logic
-Fix snapshot_builder.py to output the v3 schema that the new desktop app will eventually produce, plus add a schema bridge so the PWA works with both old and new formats
-
-Final schema checks
-Final schema checks
-continue
-
-4:28 PM
-Now I have everything. The snapshot uses v2 schema (not v3). I need to:
-
-Rewrite the PWA to read the actual v2 schema fields correctly across all tabs
-Build Strategy Scanner from signal_breakdown + strategy_scanner.py logic
-Build Options Screener from options_screener straddle/covered_call data
-Add a schema-bridge so PWA handles both v2 and future v3 schema
-
-Viewed 3 files, ran a command
-Viewed 3 files, ran a command
-Now I have full context. I'll do a complete rewrite — fixing the schema bridge, all 5 existing tabs (they currently fail because they read data.futures but snapshot has near_month/futures_tracker), plus implementing the 2 new tabs with real strategy_scanner logic:
-
-
-Ran 2 commands
-Ran 2 commands
-continue
-
-11:37 PM
-Now test the schema bridge against the actual snapshot:
-
-
-Audit all actual field names in the snapshot to verify bridge mappings
-Audit all actual field names in the snapshot to verify bridge mappings
-All field names confirmed. Now I can make precise corrections to the bridge — the snapshot already has oi_chg_pct derivable directly, chg_pct needs computing from price_chg/spot, and rollover uses rolled_pct/near_oi/mid_oi. Let me fix all the bridge mappings accurately:
-
-
-Viewed 2 files, edited a file
-Viewed 2 files, edited a file
-Good — the existing code already has correct field mappings for rollover (rolled_pct, near_oi, mid_oi, near_expiry, mid_expiry). Now I need to fix one critical issue: the oi_movers gainers/losers already have full row data including chg_pct, ltp etc, so the OI tab will work. But I need to fix the top_oi_gainers mapping — the oi_movers rows don't have a pre-computed oi_chg_pct field; that needs to be derived. Let me fix that and also fix the market_summary NIFTY detection (indices are in near_month with type='IDX'):
-
-
-Verify IDX detection and oi_movers oi_chg_pct derivation
-Verify IDX detection and oi_movers oi_chg_pct derivation
-Critical findings:
-
-IDX rows have spot=0.0 — so chg_pct derivation from price_chg/prevLtp will fail for indices. Need fallback.
-oi_movers rows have no oi_chg_pct field — confirmed, need to derive it from oi and oi_chg
-oi_movers rows have ALL fields including signal, ltp, chg — so they can be passed directly to showSymbolSheet
-Now fix all three issues in the bridge:
-
-
-Edited a file, ran a command
-Edited a file, ran a command
-Now fix the top_oi_gainers mapping — oi_movers rows have full data, derive oi_chg_pct from oi and oi_chg, and pass the enriched row so showSymbolSheet works from the OI tab:
-
-
-Edited a file, ran a command
-Edited a file, ran a command
-Now also remove the stale banOut variable reference and the unused ftMap variable:
-
-
-Ran 2 commands
-Ran 2 commands
-All green. Copy to output:
-
-
-Ran a command, read a file
-Ran a command, read a file
-Session 3 — Complete & Verified ✅
-
-What was fixed and built
-🔧 Root cause fixed — Schema Bridge
-The old PWA was looking for data.futures[], data.market_summary etc (v3 schema) but your live snapshot is v2 schema with near_month[], mid_month[], far_month[], signal_breakdown{}, oi_movers{}, rollover[], ban_list{}. Every tab was silently getting empty arrays. Now fixed with a full bridge that auto-detects v2 vs v3.
-
-Verified field mappings (against actual snapshot):
-
-Snapshot field	Bridge maps to	Used by
-near_month[].price_chg	chg_pct (derived)	All tabs
-near_month[].oi, oi_chg	oi_chg_pct (derived)	All tabs
-near_month[].signal	trend	Row colours, badges
-rollover[].rolled_pct	rollover_pct	Rollover tab
-rollover[].near_oi/mid_oi	oi_near/oi_next	Rollover tab
-oi_movers.gainers/losers	enriched full rows	OI tab
-signal_breakdown{LB/SB/LU/SC}	Strategy Scanner hits	Scanner tab
-ban_list.current[]	ban_status='ban'	Ban badge
-🎯 Strategy Scanner — derives 7 strategy types from signal_breakdown using scoring logic: OI_LONG, OI_SHORT, SQUEEZE, BULL_TRAP, CONV_LONG, CONV_SHORT, ROLLOVER_LONG. Score 0–10. Filter by strategy type. Bottom sheet shows explanation of why the setup triggered.
-
-🔎 Options Screener — reads options_screener.straddle[] and covered_call[]. Shows Short Straddle (C+P premium, ROI%, breakevens, IV, PCR) and Covered Call (premium, ROI%, downside cover%). Graceful empty state with exact action hint when options aren't loaded.
-
-NIFTY / BANKNIFTY on Pulse tab now show real values (they're IDX rows in near_month with spot=0 — the bridge handles this correctly by deriving chg_pct from price_chg / (ltp - price_chg)).
-
-
-Index
-Code · HTML 
-whats done  and whats pending
-
-11:42 PM
-NSE F&O Tracker v3.0 — Status Summary
-✅ DONE
-Desktop App (desktop_app_v3.py — 5093 lines)
-
-All Session 2 patches applied (2a through 2h + fix_warn)
-Heatmap: composite score, top-10 tiles 2× height, 3 filter modes
-Row colours: LB=green, SB=red, LU=amber, SC=purple, IDX=blue
-OI Analysis: dual-screen (OI Movers + Signal Breakdown)
-CSV Export on all tabs
-Auto-load options bhavcopy on startup
-Options Screener: fixed "No Symbols" error
-Supporting Python files
-
-snapshot_builder.py — builds full JSON snapshot
-github_pusher.py — pushes to GitHub with SHA handling, auto-resolves owner
-config_manager_v3.py — export/PWA keys, audit fields
-strategy_scanner.py — 7 strategy types with scoring
-options_screener.py — straddle + covered call
-fo_parser_v3.py — core parser
-PWA (index.html — 87.6 KB, Session 3)
-
-Tab	Status	Notes
-📊 Pulse	✅ Working	NIFTY/BNF, A/D, signals, heatmap, gainers/losers
-📈 Futures	✅ Working	Near-month, filters, sort, bottom sheet
-🔥 OI	✅ Working	OI Movers + Signal Breakdown dual screen
-🔄 Rollover	✅ Working	Gauge, table, CoC%, bias
-⚖️ Basis	✅ Working	Premium/discount/parity, conv score
-🎯 Strategy	✅ Working	7 strategies from signal_breakdown scoring
-🔎 Screener	✅ Working	Straddle + Covered Call, graceful empty state
-Schema Bridge — auto-detects v2 (live snapshot) vs v3 (future), normalises all field names
-
-⏳ PENDING
-Session 4 — Options Chain tab (PWA)
-
-Requires options_summary.chain[] populated in snapshot
-Desktop app needs to push chain data per symbol/expiry
-Tab: CE/PE ladder, OI bars, Max Pain visual, PCR by strike
-Session 5 — Watchlist + Alerts tab (PWA)
-
-Reads watchlist[] and alerts[] from snapshot
-Watchlist: starred symbols with notes, quick-view
-Alerts: ⚡OI Spike, price alerts, triggered vs pending
-Session 6 — PWA Polish
-
-Install prompt (beforeinstallprompt)
-Share button (Web Share API)
-Notification badge on tab when alerts fire
-App version / last-push timestamp in footer
-manifest.json + sw.js review (offline cache strategy)
-Known Issues Still Open
-
-fpdf/pypdf conflict warning on startup → pip uninstall pypdf && pip install --upgrade fpdf2
-Options Screener shows empty until Load Options clicked in desktop app + snapshot rebuilt
-config_v3.json → github_repo needs username/repo format (not just repo)
-What you need to do now
-Replace index.html on GitHub Pages with the new file
-Verify all 7 tabs load with your current snapshot
-Run Load Options in desktop app → push snapshot → check Screener tab populates
-Tell me which session to do next (4, 5, or 6)
-give me desktop app v3 py . mine doesnt have run option screener
-
-11:47 PM
-Let me read the current desktop app and options screener files first:
-
-
-Viewed 4 files
-Viewed 4 files
-Now I have everything. The issue is clear — the desktop app has the screener tab built (_build_screener_tab) and the Run button exists, but the _tab_screener tab page itself needs to be created and added to the notebook. Let me find where tabs are built in the app:
-
-
-Ran 2 commands, viewed a file
-Ran 2 commands, viewed a file
-The tab IS registered. The issue must be that _make_tree and _sort_screener_col are not being imported/bound. Let me check the exact imports and what's missing:
-
-
-Ran 2 commands
-Ran 2 commands
-Found the bug. _make_tree, _sort_screener_col, _render_straddle, _render_covered_call, and _export_screener_active are imported but never monkey-patched onto the class. They're just module-level functions that _build_screener_tab calls directly (not as self.), so they work at build time — but the missing ones are _export_screener_active which IS called as self._export_screener_active(). Also _run_screener is patched but check if the "▶ Run Screener" button is actually wired:
-
-
-Confirm button wiring and export binding
-Confirm button wiring and export binding
-The Run button IS wired via self._run_screener and that IS patched. The Export button calls self._export_screener_active() — that is NOT patched. Now let me check if there's a snapshot_builder.py integration for screener results and what _scr_results the snapshot builder reads:
-
-
-Ran 2 commands
-Ran 2 commands
-Found the second bug. options_screener.py stores results in self._scr_results but snapshot_builder.py reads from app._screener_results. They don't match. Now I have the complete picture — I'll patch the desktop app:
-
-Missing monkey-patches: _export_screener_active
-Attribute name mismatch: _scr_results vs _screener_results — fix in snapshot_builder bridge
-Missing _screener_last_run and _screener_data_mode_var attributes
-Let me now produce the corrected desktop_app_v3.py:
-
-
-Ran a command, viewed a file
-Ran a command, viewed a file
-Now fix all issues in one targeted patch:
-
-
-Add missing monkey-patches for screener export, fix attribute bridge for snapshot, and move auto_load before main
-Add missing monkey-patches for screener export, fix attribute bridge for snapshot, and move auto_load before main
-Now fix the snapshot_builder.py attribute name bridge on its side too:
-
-
-Ran a command, viewed a file
-Ran a command, viewed a file
-Now I see two more issues in snapshot_builder:
-
-_ga(app, "_screener_results", {}) — misses _scr_results. Fix: add _scr_results as fallback
-last_run_var.get() — we're now storing a string in _screener_last_run, not a tk.StringVar. Fix that too
-Key mismatches: screener stores "C+P", "Max ROI %", "Lot Size", "Max Profit" but snapshot_builder reads "Combined", "ROI%", "Lot", "Max Profit" — need to fix serializer keys
-
-Edited a file, ran a command
-Edited a file, ran a command
-Both files clean. Copy to outputs:
-
-
-Ran a command, read a file
-Ran a command, read a file
-Two files patched. Here's exactly what was wrong and what was fixed:
-
-🐛 Bugs Found & Fixed
-desktop_app_v3.py — 3 fixes
-
-Bug	Symptom	Fix
-_export_screener_active not monkey-patched	Export CSV button crashed with AttributeError	Added FO_TrackerApp_v3._export_screener_active = _export_screener_active
-_auto_load_options_silent bound AFTER __main__	Options auto-load failed on startup	Moved binding before if __name__ == "__main__"
-_screener_results / _scr_results name mismatch	After running screener, snapshot push always sent empty screener data	Added property bridge + _run_screener_patched wrapper to keep _screener_last_run updated
-snapshot_builder.py — 3 fixes
-
-Bug	Symptom	Fix
-Read _screener_results only	_scr_results (actual attribute) was always missed	Now reads _scr_results first, falls back to _screener_results
-Key mismatches: "C+P" → "Combined", "Lot Size" → "Lot", "Max ROI %" → "ROI%", "Safety %" → "Downside%"	Straddle/covered call rows serialised as all zeros in snapshot	Fixed serializers to use actual key names from options_screener.py with fallbacks
-_screener_last_run.get() assumed tk.StringVar	Crashed when string was stored instead	Now handles both plain string and tk.StringVar
-✅ Now your workflow will work end-to-end:
-Load bhavcopy → Load Options → Run screener tab → results populate
-Click Export JSON → GitHub → snapshot now includes options_screener.straddle[] and options_screener.covered_call[]
-PWA Screener tab shows the data automatically
-
-Desktop app v3
-PY 
-
-Snapshot builder
-PY 
-
-
-Claude Fable 5 is currently unavailable.
-Learn more(opens in new tab)
-
-
-
-
-Claude is AI and can make mistakes. Please double-check responses.
-
-
-Index · HTML
 <!DOCTYPE html>
 <html lang="en-IN">
 <head>
@@ -676,19 +238,19 @@ tr.sc td { color: #a855f7; }
    Schema-bridge: normalises v2 snapshot into unified FO.N object
    used by all tab renderers.
    ══════════════════════════════════════════════════════════════════════ */
- 
+
 const DATA_URL  = './fo_snapshot_v3.json';
 const REFRESH_MS = 5 * 60 * 1000;
- 
+
 window.FO = { data: null, N: null, loading: false, lastFetch: null, offline: false, tab: 'pulse' };
 const $ = id => document.getElementById(id);
- 
+
 // ── Service Worker ────────────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {});
   navigator.serviceWorker.addEventListener('message', e => { if (e.data?.type === 'BG_REFRESH') loadData(); });
 }
- 
+
 /* ══════════════════════════════════════════════════════════════════════
    SCHEMA BRIDGE — converts v2 OR v3 snapshot → unified FO.N
    v2 keys: futures_tracker, near_month, mid_month, far_month,
@@ -697,23 +259,23 @@ if ('serviceWorker' in navigator) {
    ══════════════════════════════════════════════════════════════════════ */
 function normalise(raw) {
   if (!raw) return null;
- 
+
   // Detect schema version
   const isV3 = !!raw.market_summary;
   const isV2 = !!raw.futures_tracker || !!raw.near_month;
- 
+
   if (isV3) return normaliseV3(raw);
   if (isV2) return normaliseV2(raw);
   return null; // unknown
 }
- 
+
 function normaliseV2(d) {
   // Field names verified against fo_snapshotv3.json audit 08-Jun-2026
   const nearRaw = d.near_month || [];
   const midRaw  = d.mid_month  || [];
   const farRaw  = d.far_month  || [];
   const banCurr = Array.isArray((d.ban_list||{}).current) ? d.ban_list.current : [];
- 
+
   function enrichRow(r, rank) {
     const ltp      = parseFloat(r.ltp        || 0);
     const spot     = parseFloat(r.spot       || 0);
@@ -763,32 +325,32 @@ function normaliseV2(d) {
       instrument:    (r.type||'STK')==='IDX' ? 'FUTIDX' : 'FUTSTK',
     };
   }
- 
+
   const near = nearRaw.map(r => enrichRow(r, 1));
   const mid  = midRaw .map(r => enrichRow(r, 2));
   const far  = farRaw .map(r => enrichRow(r, 3));
   const futures = [...near, ...mid, ...far];
- 
+
   // ── market_summary ────────────────────────────────────────────────────
   const meta      = d.meta      || {};
   const expiries  = meta.expiries || {};
- 
+
   // Compute index prices from near_month IDX rows
   function idxRow(sym) { return near.find(r => r.symbol===sym && r.type==='IDX'); }
   const niftyR  = idxRow('NIFTY');
   const bnfR    = idxRow('BANKNIFTY');
   const mnR     = idxRow('MIDCPNIFTY');
   const fnR     = idxRow('FINNIFTY');
- 
+
   const oimov   = d.oi_movers || {};
   const sigBD   = d.signal_breakdown || {};
   const advCount = near.filter(r=>r.chg_pct>0).length;
   const decCount = near.filter(r=>r.chg_pct<0).length;
- 
+
   // oi_movers rows carry full data; enrich same way for consistent shape
   const oimovG = (oimov.gainers||[]).map(r => enrichRow(r, 1));
   const oimovL = (oimov.losers ||[]).map(r => enrichRow(r, 1));
- 
+
   const market_summary = {
     nifty_ltp:         niftyR?.ltp        || null,
     nifty_chg_pct:     niftyR?.chg_pct    || 0,
@@ -806,14 +368,14 @@ function normaliseV2(d) {
     ban_count:         banCurr.length,
     out_of_ban:        Array.isArray((d.ban_list||{}).out_of_ban) ? d.ban_list.out_of_ban : [],
   };
- 
+
   // ── heatmap from near ─────────────────────────────────────────────────
   const heatmap = near.map(r=>({
     symbol: r.symbol, chg_pct: r.chg_pct, oi_chg_pct: r.oi_chg_pct,
     ltp: r.ltp, oi: r.oi, trend: r.trend, sector: r.sector||'Other',
   }));
   const market_pulse = { sectors: [], heatmap };
- 
+
   // ── rollover ──────────────────────────────────────────────────────────
   const rvRaw = Array.isArray(d.rollover) ? d.rollover : (d.rollover?.symbols||[]);
   const rvRows = rvRaw.map(r => ({
@@ -834,7 +396,7 @@ function normaliseV2(d) {
   const totalNext = rvRows.reduce((s,r)=>s+r.oi_next,0);
   const totalAll  = totalNear + totalNext;
   const market_rollover_pct = totalAll>0 ? +(totalNext/totalAll*100).toFixed(2) : null;
- 
+
   // ── signal_breakdown → strategy_scanner ──────────────────────────────
   // Build strategy scanner data from signal_breakdown hits
   const STRAT_DEFS = {
@@ -846,7 +408,7 @@ function normaliseV2(d) {
     CONV_SHORT:    { name:'Convergence Short',        emoji:'⏰', bias:'bearish', signals:['SB','LU'] },
     ROLLOVER_LONG: { name:'Rollover Continuation',   emoji:'🔄', bias:'bullish', signals:['LB'] },
   };
- 
+
   // Build a flat map of all signal rows keyed by symbol for scoring
   const allSigRows = {};
   Object.entries(sigBD).forEach(([sig, rows]) => {
@@ -855,13 +417,13 @@ function normaliseV2(d) {
       if (!allSigRows[sym]) allSigRows[sym] = enrichRow(r, 1);
     });
   });
- 
+
   // Also enrich from basis_summary for conv candidates
   (d.basis_summary||[]).forEach(r => {
     const sym = r.symbol;
     if (!allSigRows[sym]) allSigRows[sym] = enrichRow(r, 1);
   });
- 
+
   function scoreRow(r) {
     const sig   = r.signal||r.trend||'';
     const bp    = parseFloat(r.basis_pct||0);
@@ -871,7 +433,7 @@ function normaliseV2(d) {
     const pat   = String(r.pattern||'');
     const ban   = r.ban_status||'normal';
     const scores = {};
- 
+
     // OI_LONG
     if (sig==='LB') {
       let s=2;
@@ -926,7 +488,7 @@ function normaliseV2(d) {
     }
     return scores;
   }
- 
+
   function explain(r, code) {
     const bp=parseFloat(r.basis_pct||0), conv=parseFloat(r.conv_score||0);
     const dte=parseInt(r.days_to_exp||0), oi5d=parseFloat(r.oi_5d_pct||0);
@@ -940,7 +502,7 @@ function normaliseV2(d) {
     if (code==='CONV_SHORT')return 'Futures at +'+bp.toFixed(2)+'% premium, Conv★='+conv.toFixed(1)+', '+dte+'d to expiry';
     return 'Score '+code;
   }
- 
+
   const strategies = {};
   Object.entries(STRAT_DEFS).forEach(([code, meta]) => {
     const hits = [];
@@ -951,12 +513,12 @@ function normaliseV2(d) {
     hits.sort((a,b)=>b.score-a.score);
     strategies[code] = { name: meta.name, emoji: meta.emoji, bias: meta.bias, hits: hits.slice(0,10) };
   });
- 
+
   const strategy_scanner = { last_run: meta.date_fmt||meta.generated_at||'', strategies };
- 
+
   // ── options_screener passthrough ──────────────────────────────────────
   const options_screener = d.options_screener || { straddle:[], covered_call:[], last_run:'', data_mode:'EOD Bhavcopy' };
- 
+
   // ── meta normalise ────────────────────────────────────────────────────
   const normMeta = {
     generated_at: meta.generated_at || '',
@@ -968,7 +530,7 @@ function normaliseV2(d) {
     expiries,
     ban_count:    banCurr.length,
   };
- 
+
   return {
     _schema: 'v2',
     meta:             normMeta,
@@ -983,7 +545,7 @@ function normaliseV2(d) {
     alerts:           d.alerts     || [],
   };
 }
- 
+
 function normaliseV3(d) {
   // v3 schema already matches expected structure — just pass through
   // with light enrichment for missing fields
@@ -994,7 +556,7 @@ function normaliseV3(d) {
   }));
   return { _schema: 'v3', ...d, futures };
 }
- 
+
 // ── Data loader ───────────────────────────────────────────────────────
 async function loadData(force = false) {
   if (FO.loading) return;
@@ -1029,7 +591,7 @@ async function loadData(force = false) {
     } catch { showError(); }
   } finally { FO.loading = false; showPTR(false); }
 }
- 
+
 // ── Tab router ────────────────────────────────────────────────────────
 const TAB_RENDERERS = {
   pulse:    () => window.renderPulse    && renderPulse(FO.N),
@@ -1041,7 +603,7 @@ const TAB_RENDERERS = {
   screener: () => window.renderScreener && renderScreener(FO.N),
 };
 const TABS = ['pulse','futures','oi','rollover','basis','scanner','screener'];
- 
+
 function switchTab(name) {
   FO.tab = name;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1055,7 +617,7 @@ function renderCurrentTab() {
   const fn = TAB_RENDERERS[FO.tab];
   if (fn) try { fn(); } catch(e) { console.error('Render error ['+FO.tab+']:', e); }
 }
- 
+
 // Swipe
 let touchX0 = 0;
 document.addEventListener('touchstart', e => { touchX0 = e.touches[0].clientX; }, {passive:true});
@@ -1066,12 +628,12 @@ document.addEventListener('touchend',   e => {
   if (dx < 0 && idx < TABS.length-1) switchTab(TABS[idx+1]);
   if (dx > 0 && idx > 0)             switchTab(TABS[idx-1]);
 }, {passive:true});
- 
+
 // Pull-to-refresh
 let ptY0 = 0, pulling = false;
 document.addEventListener('touchstart', e => { const pg=document.querySelector('.page.active'); if(pg&&pg.scrollTop===0){ptY0=e.touches[0].clientY;pulling=true;} },{passive:true});
 document.addEventListener('touchend',   e => { if(pulling&&e.changedTouches[0].clientY-ptY0>60) loadData(true); pulling=false; },{passive:true});
- 
+
 // ── Bottom sheet ──────────────────────────────────────────────────────
 function openSheet(html, title) {
   const sheet = $('bottom-sheet');
@@ -1081,7 +643,7 @@ function openSheet(html, title) {
 }
 function closeSheet() { $('sheet-overlay').classList.remove('show'); $('bottom-sheet').classList.remove('open'); }
 document.getElementById('sheet-overlay').addEventListener('click', closeSheet);
- 
+
 // ── Helpers ───────────────────────────────────────────────────────────
 function fmt_inr(v) { if(v==null||isNaN(v))return'—'; const n=parseFloat(v); if(Math.abs(n)>=1e7)return'₹'+(n/1e7).toFixed(2)+'Cr'; if(Math.abs(n)>=1e5)return'₹'+(n/1e5).toFixed(2)+'L'; return'₹'+n.toLocaleString('en-IN',{maximumFractionDigits:2}); }
 function fmt_oi(v)  { if(v==null)return'—'; const n=parseInt(v); if(n>=1e7)return(n/1e7).toFixed(2)+'Cr'; if(n>=1e5)return(n/1e5).toFixed(2)+'L'; if(n>=1e3)return(n/1e3).toFixed(1)+'K'; return n.toString(); }
@@ -1093,7 +655,7 @@ function ban_badge(r){ return r?.ban_status==='ban'?'<span class="ban-badge">BAN
 window.fmt_inr=fmt_inr; window.fmt_oi=fmt_oi; window.fmt_pct=fmt_pct;
 window.sig_badge=sig_badge; window.row_cls=row_cls; window.ban_badge=ban_badge;
 window.openSheet=openSheet; window.closeSheet=closeSheet;
- 
+
 function makeSortable(tableId) {
   const tbl=document.getElementById(tableId); if(!tbl)return;
   let sc=-1,sa=true;
@@ -1118,7 +680,7 @@ function makeSortable(tableId) {
   });
 }
 window.makeSortable=makeSortable;
- 
+
 function setOfflineBanner(on, date) {
   const b=$('offline-banner');
   if(on){b.textContent='⚠ Offline — cached data'+(date?' as of '+date:'');b.classList.add('show');$('content').classList.add('has-banner');}
@@ -1145,7 +707,7 @@ function toggleTheme() {
 if(localStorage.getItem('fo-theme')==='light'){document.body.classList.add('light');const tb=$('theme-btn');if(tb)tb.textContent='🌙';}
 setInterval(()=>loadData(),REFRESH_MS);
 document.addEventListener('DOMContentLoaded',()=>{switchTab('pulse');loadData();});
- 
+
 /* ══════════════════════════════════════════════════════════════════════
    PULSE TAB
    ══════════════════════════════════════════════════════════════════════ */
@@ -1161,7 +723,7 @@ function renderPulse(data) {
   const nUp=(ms.nifty_chg_pct||0)>=0, bUp=(ms.banknifty_chg_pct||0)>=0;
   const sorted=[...near].sort((a,b)=>(b.chg_pct||0)-(a.chg_pct||0));
   const gainers5=sorted.slice(0,5), losers5=sorted.slice(-5).reverse();
- 
+
   pg.innerHTML=`
     <div class="summary-row">
       <div class="summary-card">
@@ -1214,12 +776,12 @@ function renderPulse(data) {
       </select>
     </div>
     <div id="heatmap-grid"></div>`;
- 
+
   const hmRows = hm.length ? hm : near;
   renderHeatmap(hmRows);
   document.getElementById('hm-filter').addEventListener('change',e=>renderHeatmap(hmRows,e.target.value));
 }
- 
+
 function renderHeatmap(rows, mode='rank50') {
   const grid=document.getElementById('heatmap-grid'); if(!grid)return;
   function sc(r){ return (parseFloat(r.chg_pct||0)*0.5)+(parseFloat(r.oi_chg_pct||0)*0.5); }
@@ -1228,7 +790,7 @@ function renderHeatmap(rows, mode='rank50') {
   if(mode==='all') heat=scored;
   else if(mode==='g25l25'){ const byP=[...rows].sort((a,b)=>(b.chg_pct||0)-(a.chg_pct||0)); heat=[...byP.slice(0,25),...byP.slice(-25).reverse()]; }
   else heat=scored.slice(0,50);
- 
+
   function ts(s,p){ const a=Math.abs(s); if(a<1)return{bg:'#1a1f2e',fg:p>=0?'#22c55e':'#ef4444',brd:'#2a3040'}; if(s>=5)return{bg:'#004d00',fg:'#fff',brd:'#006600'}; if(s>=3)return{bg:'#006600',fg:'#fff',brd:'#008800'}; if(s>=1)return{bg:'#1a8c1a',fg:'#fff',brd:'#22aa22'}; if(s>=-3)return{bg:'#991a1a',fg:'#fff',brd:'#bb2222'}; if(s>=-5)return{bg:'#cc0000',fg:'#fff',brd:'#dd1111'}; return{bg:'#800000',fg:'#fff',brd:'#990000'}; }
   const SC2={LB:'#00e676',SB:'#ff5252',LU:'#ffab40',SC:'#ce93d8'};
   grid.innerHTML=heat.map((r,i)=>{
@@ -1247,7 +809,7 @@ function renderHeatmap(rows, mode='rank50') {
       ${sb2}</div>`;
   }).join('');
 }
- 
+
 function showSymbolSheet(r) {
   if(typeof r==='string')try{r=JSON.parse(r);}catch{return;}
   const p=parseFloat(r.chg_pct||0),o=parseFloat(r.oi_chg_pct||0);
@@ -1270,14 +832,14 @@ function showSymbolSheet(r) {
 }
 window.showSymbolSheet=showSymbolSheet;
 window.renderPulse=renderPulse;
- 
+
 /* ══════════════════════════════════════════════════════════════════════
    FUTURES TAB
    ══════════════════════════════════════════════════════════════════════ */
 function renderFutures(data) {
   const pg=document.getElementById('page-futures'); if(!data||!pg)return;
   const near=(data.futures||[]).filter(r=>r.expiry_rank===1);
- 
+
   pg.innerHTML=`
     <div class="filter-bar">
       <input id="fut-search" type="search" placeholder="Search symbol…">
@@ -1301,7 +863,7 @@ function renderFutures(data) {
       <thead><tr><th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI</th><th>OI Chg%</th><th>Basis%</th><th>Conv</th><th>Sig</th></tr></thead>
       <tbody id="fut-tbody"></tbody>
     </table></div>`;
- 
+
   function apply() {
     const q=document.getElementById('fut-search').value.trim().toUpperCase();
     const sg=document.getElementById('fut-signal').value;
@@ -1359,7 +921,7 @@ function showFutSheet(r) {
 }
 window.showFutSheet=showFutSheet;
 window.renderFutures=renderFutures;
- 
+
 /* ══════════════════════════════════════════════════════════════════════
    OI TAB  — dual screen: OI Movers + Signal Breakdown
    ══════════════════════════════════════════════════════════════════════ */
@@ -1372,7 +934,7 @@ function renderOI(data) {
   const losers  = ms.top_oi_losers  || [...near].sort((a,b)=>(a.oi_chg_pct||0)-(b.oi_chg_pct||0)).slice(0,25);
   const sigBD   = { LB:[], SB:[], LU:[], SC:[] };
   near.forEach(r=>{ if(r.trend && sigBD[r.trend]) sigBD[r.trend].push(r); });
- 
+
   pg.innerHTML=`
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <button id="oi-btn-movers" onclick="oiSwitch('movers')"
@@ -1430,7 +992,7 @@ function renderOI(data) {
           </table></div>`;
       }).join('')}
     </div>`;
- 
+
   oiSwitch(_oiScreen);
 }
 function oiSwitch(s) {
@@ -1449,7 +1011,7 @@ function oiSwitch(s) {
   }
 }
 window.oiSwitch=oiSwitch; window.renderOI=renderOI;
- 
+
 /* ══════════════════════════════════════════════════════════════════════
    ROLLOVER TAB
    ══════════════════════════════════════════════════════════════════════ */
@@ -1458,7 +1020,7 @@ function renderRollover(data) {
   const rv=data.rollover||{};
   const rows=rv.symbols||[];
   const mktPct=rv.market_rollover_pct||0;
- 
+
   if(!rows.length){
     pg.innerHTML='<div class="error-state"><div class="err-icon">📭</div><div>No rollover data in snapshot</div></div>';
     return;
@@ -1486,7 +1048,7 @@ function renderRollover(data) {
       <thead><tr><th>Symbol</th><th>Roll%</th><th>Near OI</th><th>Next OI</th><th>CoC%</th><th>Bias</th></tr></thead>
       <tbody id="ro-tbody"></tbody>
     </table></div>`;
- 
+
   function apply() {
     const q=document.getElementById('ro-search').value.trim().toUpperCase();
     const so=document.getElementById('ro-sort').value;
@@ -1533,7 +1095,7 @@ function showRollSheet(r) {
   `,r.symbol+' — Rollover');
 }
 window.showRollSheet=showRollSheet; window.renderRollover=renderRollover;
- 
+
 /* ══════════════════════════════════════════════════════════════════════
    BASIS TAB
    ══════════════════════════════════════════════════════════════════════ */
@@ -1544,7 +1106,7 @@ function renderBasis(data) {
   const premium =rows.filter(r=>(r.basis_pct||0)> 0.5).length;
   const discount=rows.filter(r=>(r.basis_pct||0)<-0.5).length;
   const parity  =rows.length-premium-discount;
- 
+
   pg.innerHTML=`
     <div style="display:flex;gap:8px;margin-bottom:10px">
       <div class="card" style="flex:1;text-align:center;padding:8px;border-color:#064e1a">
@@ -1578,7 +1140,7 @@ function renderBasis(data) {
       <thead><tr><th>Symbol</th><th>Spot</th><th>LTP</th><th>Basis%</th><th>FV</th><th>Conv</th><th>Sig</th></tr></thead>
       <tbody id="ba-tbody"></tbody>
     </table></div>`;
- 
+
   function apply() {
     const q=document.getElementById('ba-search').value.trim().toUpperCase();
     const f=document.getElementById('ba-filter').value;
@@ -1633,34 +1195,34 @@ function showBasisSheet(r) {
   `,r.symbol+' — Basis');
 }
 window.showBasisSheet=showBasisSheet; window.renderBasis=renderBasis;
- 
+
 /* ══════════════════════════════════════════════════════════════════════
    STRATEGY SCANNER TAB — reads strategy_scanner.strategies{}
    Built from signal_breakdown + scoring in schema bridge (v2)
    or from strategy_scanner[] in v3 snapshot
    ══════════════════════════════════════════════════════════════════════ */
 let _scanFilter='', _scanStrat='all', _scanSort='score_desc';
- 
+
 function renderScanner(data) {
   const pg=document.getElementById('page-scanner'); if(!data||!pg)return;
   const ss   = data.strategy_scanner || {};
   const strats = ss.strategies || {};
- 
+
   // Flatten all hits across all strategies into a unified list
   const BIAS_CLS = { bullish:'strat-bullish', bearish:'strat-bearish', neutral:'strat-neutral' };
   const BIAS_LBL = { bullish:'▲ Bullish', bearish:'▼ Bearish', neutral:'● Neutral' };
- 
+
   // Build strategy options for filter
   const stratCodes = Object.keys(strats).filter(k => (strats[k].hits||[]).length > 0);
   const totalHits  = stratCodes.reduce((n,k)=>n+(strats[k].hits||[]).length,0);
- 
+
   // Summary bar
   let bull=0,bear=0,neu=0;
   stratCodes.forEach(k => {
     const b=(strats[k].bias||'').toLowerCase();
     (strats[k].hits||[]).forEach(()=>{ if(b==='bullish')bull++; else if(b==='bearish')bear++; else neu++; });
   });
- 
+
   pg.innerHTML=`
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
       <div class="card" style="text-align:center;padding:8px;border-color:#064e1a">
@@ -1689,7 +1251,7 @@ function renderScanner(data) {
     </div>
     <div id="sc-count" style="font-size:11px;color:var(--fg2);margin-bottom:6px"></div>
     <div id="sc-cards"></div>`;
- 
+
   if(!stratCodes.length) {
     pg.querySelector('#sc-cards').innerHTML=`<div class="error-state" style="height:160px">
       <div class="err-icon">🎯</div>
@@ -1697,12 +1259,12 @@ function renderScanner(data) {
       <div style="font-size:11px;color:var(--fg2);margin-top:6px">Run a data load in the desktop app</div></div>`;
     return;
   }
- 
+
   function apply() {
     _scanFilter = document.getElementById('sc-search').value.trim().toUpperCase();
     _scanStrat  = document.getElementById('sc-strat').value;
     _scanSort   = document.getElementById('sc-sort').value;
- 
+
     // Build flat list {stratCode, stratMeta, ...hit}
     let list = [];
     stratCodes.forEach(k => {
@@ -1717,7 +1279,7 @@ function renderScanner(data) {
       if(_scanSort==='sym_asc') return (a.symbol||'').localeCompare(b.symbol||'');
       return (b.score||0)-(a.score||0);
     });
- 
+
     document.getElementById('sc-count').textContent=list.length+' setup'+(list.length!==1?'s':'');
     document.getElementById('sc-cards').innerHTML = list.map(r=>{
       const bias  = r._bias;
@@ -1751,13 +1313,13 @@ function renderScanner(data) {
       </div>`;
     }).join('');
   }
- 
+
   document.getElementById('sc-search').addEventListener('input',apply);
   document.getElementById('sc-strat').addEventListener('change',apply);
   document.getElementById('sc-sort').addEventListener('change',apply);
   apply();
 }
- 
+
 function showStratSheet(r) {
   if(typeof r==='string')try{r=JSON.parse(r);}catch{return;}
   const bp=parseFloat(r.basis_pct||0), score=parseFloat(r.score||0);
@@ -1782,12 +1344,12 @@ function showStratSheet(r) {
   `,(r.ban_status==='ban'?'🚫 ':'')+r.symbol+' — Strategy');
 }
 window.showStratSheet=showStratSheet; window.renderScanner=renderScanner;
- 
+
 /* ══════════════════════════════════════════════════════════════════════
    OPTIONS SCREENER TAB — reads options_screener.straddle[] + covered_call[]
    ══════════════════════════════════════════════════════════════════════ */
 let _scrTab='straddle';
- 
+
 function renderScreener(data) {
   const pg=document.getElementById('page-screener'); if(!data||!pg)return;
   const os   = data.options_screener || {};
@@ -1795,7 +1357,7 @@ function renderScreener(data) {
   const cc   = os.covered_call || [];
   const mode = os.data_mode    || 'EOD Bhavcopy';
   const lrun = os.last_run     || '—';
- 
+
   pg.innerHTML=`
     <div style="display:flex;gap:8px;margin-bottom:8px">
       <button id="scr-btn-straddle" onclick="scrSwitch('straddle')"
@@ -1808,7 +1370,7 @@ function renderScreener(data) {
       </button>
     </div>
     <div style="font-size:10px;color:var(--fg2);margin-bottom:8px">Mode: ${mode} · Last run: ${lrun}</div>
- 
+
     <div id="scr-pane-straddle">
       ${strd.length ? `
         <div class="filter-bar">
@@ -1831,7 +1393,7 @@ function renderScreener(data) {
           </div>
         </div>`}
     </div>
- 
+
     <div id="scr-pane-cc" style="display:none">
       ${cc.length ? `
         <div class="filter-bar">
@@ -1854,7 +1416,7 @@ function renderScreener(data) {
           </div>
         </div>`}
     </div>`;
- 
+
   // Straddle apply
   if(strd.length) {
     function applyStrd() {
@@ -1884,7 +1446,7 @@ function renderScreener(data) {
     document.getElementById('ss-sort')?.addEventListener('change',applyStrd);
     applyStrd();
   }
- 
+
   // Covered call apply
   if(cc.length) {
     function applyCC() {
@@ -1912,10 +1474,10 @@ function renderScreener(data) {
     document.getElementById('cc-sort')?.addEventListener('change',applyCC);
     applyCC();
   }
- 
+
   scrSwitch(_scrTab);
 }
- 
+
 function scrSwitch(tab) {
   _scrTab=tab;
   const ps=$('scr-pane-straddle'),pc=$('scr-pane-cc');
@@ -1931,7 +1493,7 @@ function scrSwitch(tab) {
     if(bs){bs.style.background='var(--panel)';bs.style.color='var(--fg2)';}
   }
 }
- 
+
 function showStraddleSheet(r) {
   if(typeof r==='string')try{r=JSON.parse(r);}catch{return;}
   const roi=parseFloat(r.max_roi_pct||0);
@@ -1955,7 +1517,7 @@ function showStraddleSheet(r) {
     <div class="sheet-row"><span class="lbl">Source</span><span class="val">${r.source==='live'?'🟢 Live NSE':'📂 Bhavcopy'}</span></div>
   `,r.symbol+' — Short Straddle');
 }
- 
+
 function showCCSheet(r) {
   if(typeof r==='string')try{r=JSON.parse(r);}catch{return;}
   const roi=parseFloat(r.max_roi_pct||0), ds=parseFloat(r.downside_pct||0);
@@ -1975,19 +1537,7 @@ function showCCSheet(r) {
 window.scrSwitch=scrSwitch;
 window.showStraddleSheet=showStraddleSheet; window.showCCSheet=showCCSheet;
 window.renderScreener=renderScreener;
- 
+
   </script>
 </body>
 </html>
- 
-
-
-
-
-
-
-
-
-
-
-
