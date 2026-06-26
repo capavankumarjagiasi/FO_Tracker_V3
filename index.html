@@ -1,1543 +1,2281 @@
 <!DOCTYPE html>
-<html lang="en-IN">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#1a3a5c">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="F&O Tracker">
-  <meta name="description" content="NSE Futures & Options EOD Data Tracker by SDK Fintech">
-  <title>NSE F&amp;O Tracker</title>
-  <link rel="manifest" href="manifest.json">
-  <style>
-:root {
-  --bg:      #0d1b2a;
-  --panel:   #1a2e42;
-  --panel2:  #1f3850;
-  --fg:      #d0e8f8;
-  --fg2:     #7ca8c8;
-  --accent:  #1a7abf;
-  --green:   #22c55e;
-  --red:     #ef4444;
-  --amber:   #f59e0b;
-  --purple:  #a855f7;
-  --blue:    #3b82f6;
-  --border:  #2a3f54;
-  --shadow:  rgba(0,0,0,0.4);
-  --tab-h:   56px;
-  --head-h:  48px;
-  --radius:  8px;
-}
-body.light {
-  --bg:      #f0f4f8;
-  --panel:   #ffffff;
-  --panel2:  #e8f0f8;
-  --fg:      #1a2e42;
-  --fg2:     #4a6a8a;
-  --border:  #c8d8e8;
-  --shadow:  rgba(0,0,0,0.1);
-}
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { height: 100%; overflow: hidden; }
-body {
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  background: var(--bg); color: var(--fg);
-  font-size: 13px; -webkit-tap-highlight-color: transparent;
-}
-#header {
-  height: var(--head-h); background: var(--panel);
-  border-bottom: 1px solid var(--border);
-  display: flex; align-items: center; padding: 0 12px; gap: 8px;
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  box-shadow: 0 2px 8px var(--shadow);
-}
-#header h1 { font-size: 15px; font-weight: 700; color: var(--fg); flex: 1; }
-#header h1 span { color: var(--accent); }
-#data-ts { font-size: 11px; color: var(--fg2); white-space: nowrap; }
-#theme-btn { background: none; border: none; cursor: pointer; color: var(--fg2); font-size: 16px; padding: 4px; }
-#refresh-btn { background: var(--accent); border: none; cursor: pointer; color: #fff; font-size: 11px; padding: 4px 10px; border-radius: 4px; font-weight: 600; }
-#offline-banner {
-  display: none; background: var(--amber); color: #000;
-  text-align: center; font-size: 11px; padding: 4px;
-  position: fixed; top: var(--head-h); left: 0; right: 0; z-index: 99;
-}
-#offline-banner.show { display: block; }
-#content {
-  position: fixed; top: var(--head-h); bottom: var(--tab-h);
-  left: 0; right: 0; overflow: hidden;
-}
-#content.has-banner { top: calc(var(--head-h) + 24px); }
-.page {
-  display: none; position: absolute; inset: 0;
-  overflow-y: auto; overflow-x: hidden; padding: 8px;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NSE F&O Tracker</title>
+<link rel="manifest" href="manifest.json">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:#1a1a2e; color:#e0e0e0; min-height:100vh; }
+.header { background:#16213e; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #2a2a4a; }
+.header h1 { font-size:18px; color:#4fc3f7; font-weight:600; }
+.sync-badge { font-size:11px; color:#81c784; background:#1b5e20; padding:3px 10px; border-radius:12px; }
+.sync-badge.pending { color:#ffb74d; background:#5d4037; }
+.sync-badge.error { color:#ef5350; background:#4a0000; }
+.nav { display:flex; gap:8px; padding:12px 16px; overflow-x:auto; background:#16213e; border-bottom:1px solid #2a2a4a; }
+.nav-btn { padding:8px 16px; border:none; border-radius:20px; background:#2a2a4a; color:#b0b0c0; font-size:13px; cursor:pointer; white-space:nowrap; transition:all 0.2s; }
+.nav-btn:hover { background:#3a3a5a; }
+.nav-btn.active { background:#4fc3f7; color:#1a1a2e; font-weight:600; }
+.content { padding:16px; max-width:1200px; margin:0 auto; }
+.section-title { font-size:13px; color:#888; text-transform:uppercase; letter-spacing:1px; margin:20px 0 10px; font-weight:600; }
+
+/* Dashboard Cards */
+.cards-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-bottom:20px; }
+@media(min-width:768px){ .cards-grid { grid-template-columns:repeat(4,1fr); } }
+.card { background:#16213e; border-radius:12px; padding:16px; text-align:center; border:1px solid #2a2a4a; transition:transform 0.2s; cursor:pointer; }
+.card:hover { transform:translateY(-2px); border-color:#4fc3f7; }
+.card-icon { font-size:28px; margin-bottom:6px; }
+.card-count { font-size:32px; font-weight:700; color:#fff; }
+.card-label { font-size:12px; color:#888; margin-top:4px; }
+.card.lb .card-count { color:#27ae60; }
+.card.sb .card-count { color:#ef5350; }
+.card.lu .card-count { color:#42a5f5; }
+.card.sc .card-count { color:#f1c40f; }
+
+/* Filters */
+.filters { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+.filter-btn { padding:6px 14px; border:1px solid #2a2a4a; border-radius:16px; background:#16213e; color:#b0b0c0; font-size:12px; cursor:pointer; transition:all 0.2s; }
+.filter-btn:hover { border-color:#4fc3f7; }
+.filter-btn.active { background:#4fc3f7; color:#1a1a2e; border-color:#4fc3f7; font-weight:600; }
+
+/* Tables */
+.table-wrap { background:#16213e; border-radius:12px; overflow:hidden; border:1px solid #2a2a4a; }
+.table-wrap .table-row, .table-wrap .table-header { column-gap: 12px; }
+.table-header { display:grid; padding:10px 14px; background:#0f3460; font-size:11px; color:#aaa; font-weight:600; text-transform:uppercase; letter-spacing:0.5px; gap: 8px; }
+.table-row { display:grid; padding:10px 14px; border-bottom:1px solid #2a2a4a; font-size:13px; align-items:center; gap: 8px; }
+.table-row:last-child { border-bottom:none; }
+.table-row:hover { background:#1a1a3e; }
+.col-symbol { font-weight:600; color:#4fc3f7; }
+.col-signal { padding:3px 10px; border-radius:10px; font-size:11px; font-weight:600; text-align:center; }
+.signal-LB { background:#27ae6020; color:#27ae60; }
+.signal-SB { background:#ef535020; color:#ef5350; }
+.signal-LU { background:#42a5f520; color:#42a5f5; }
+.signal-SC { background:#f1c40f20; color:#f1c40f; }
+.col-basis { font-weight:600; }
+.basis-pos { color:#66bb6a; }
+.basis-neg { color:#ef5350; }
+.col-oi { text-align:right; }
+.col-oi .oi-chg { font-size:11px; }
+.oi-up { color:#66bb6a; }
+.oi-down { color:#ef5350; }
+.col-price { text-align:right; }
+.col-alerts { font-size:11px; }
+.alert-tag { display:inline-block; padding:2px 6px; border-radius:4px; margin:1px; font-size:10px; }
+.alert-hidisc { background:#ef535020; color:#ef5350; }
+.alert-squeeze { background:#ff980020; color:#ff9800; }
+.alert-bulltrap { background:#ff572220; color:#ff5722; }
+.alert-oispike { background:#ffeb3b20; color:#ffeb3b; }
+.alert-reshort { background:#9c27b020; color:#ce93d8; }
+.alert-recovery { background:#00bcd420; color:#00bcd4; }
+
+/* Basis Summary Bar */
+.basis-bar { display:flex; height:36px; border-radius:8px; overflow:hidden; margin-bottom:20px; font-size:11px; font-weight:600; }
+.basis-seg { display:flex; align-items:center; justify-content:center; color:#fff; min-width:60px; }
+.basis-seg.dd { background:#c62828; }
+.basis-seg.d { background:#ef6c00; }
+.basis-seg.p { background:#546e7a; }
+.basis-seg.pm { background:#0277bd; }
+.basis-seg.dp { background:#2e7d32; }
+
+/* Ban List */
+.ban-item { display:flex; align-items:center; gap:12px; padding:10px 12px; background:#16213e; border-radius:8px; margin-bottom:6px; border:1px solid #2a2a4a; }
+.ban-badge { background:#c62828; color:#fff; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+.ban-symbol { font-weight:600; color:#ef5350; }
+.ban-out { display:flex; align-items:center; gap:12px; padding:10px 12px; background:#16213e; border-radius:8px; margin-bottom:6px; border-left:3px solid #2e7d32; }
+.ban-out-badge { background:#2e7d32; color:#fff; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; }
+.ban-out-symbol { font-weight:600; color:#66bb6a; }
+
+/* Alerts List */
+.alert-item { display:flex; align-items:center; gap:12px; padding:10px 12px; background:#16213e; border-radius:8px; margin-bottom:6px; border:1px solid #2a2a4a; }
+.alert-icon { font-size:16px; }
+.alert-symbol { font-weight:600; color:#4fc3f7; min-width:80px; }
+.alert-text { font-size:13px; color:#ccc; }
+
+/* Empty State */
+.empty { text-align:center; padding:40px; color:#666; font-size:14px; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:#1a1a2e; }
+::-webkit-scrollbar-thumb { background:#4a4a6a; border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:#5a5a7a; }
+
+/* Loading */
+.loading { text-align:center; padding:60px; color:#888; }
+.spinner { width:40px; height:40px; border:3px solid #2a2a4a; border-top-color:#4fc3f7; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 16px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* Search */
+.search-box { width:100%; padding:10px 14px; background:#16213e; border:1px solid #2a2a4a; border-radius:8px; color:#e0e0e0; font-size:14px; margin-bottom:16px; }
+.search-box:focus { outline:none; border-color:#4fc3f7; }
+.search-box::placeholder { color:#666; }
+
+/* Select */
+.select-box { padding:8px 12px; background:#16213e; border:1px solid #2a2a4a; border-radius:8px; color:#e0e0e0; font-size:13px; margin-bottom:12px; }
+.select-box:focus { outline:none; border-color:#4fc3f7; }
+
+/* OI Tabs */
+.oi-tabs { display:flex; gap:8px; margin-bottom:12px; }
+.oi-tab { flex:1; padding:10px; border:none; border-radius:8px; background:#16213e; color:#b0b0c0; font-size:13px; font-weight:600; cursor:pointer; border:1px solid #2a2a4a; }
+.oi-tab.active { background:#4fc3f7; color:#1a1a2e; }
+
+/* Detail Modal */
+.modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.8); z-index:200; align-items:center; justify-content:center; padding:20px; }
+.modal-overlay.active { display:flex; }
+.modal-box { background:#16213e; border-radius:16px; max-width:500px; width:100%; max-height:90vh; overflow-y:auto; border:1px solid #2a2a4a; }
+.modal-header { display:flex; align-items:center; justify-content:space-between; padding:16px; border-bottom:1px solid #2a2a4a; }
+.modal-header h2 { font-size:18px; color:#4fc3f7; }
+.modal-close { background:none; border:none; color:#888; font-size:24px; cursor:pointer; }
+.modal-body { padding:16px; }
+.detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+.detail-item { background:#1a1a3e; border-radius:10px; padding:12px; }
+.detail-label { font-size:11px; color:#888; margin-bottom:4px; }
+.detail-value { font-size:18px; font-weight:700; }
+.detail-signal { grid-column:1/-1; text-align:center; padding:14px; border-radius:12px; font-size:18px; font-weight:700; margin-bottom:8px; }
+
+/* Manual refresh */
+.refresh-bar { display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+.refresh-btn { padding:8px 16px; background:#0f3460; color:#4fc3f7; border:1px solid #2a2a4a; border-radius:8px; font-size:12px; cursor:pointer; }
+.refresh-btn:hover { background:#1a4a7a; }
+.source-info { font-size:11px; color:#666; }
+
+
+/* Table horizontal scrolling */
+.table-scroll {
+  overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  width: 100%;
 }
-.page.active { display: block; }
-#tabbar {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  height: var(--tab-h); background: var(--panel);
-  border-top: 1px solid var(--border);
-  display: flex; z-index: 100;
-  overflow-x: auto; overflow-y: hidden;
-  -webkit-overflow-scrolling: touch; scrollbar-width: none;
+.table-scroll::-webkit-scrollbar { height: 6px; }
+.table-scroll::-webkit-scrollbar-track { background: #1a1a2e; }
+.table-scroll::-webkit-scrollbar-thumb { background: #4a4a6a; border-radius: 3px; }
+
+/* Filter pills for reports */
+.filter-pills {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  align-items: center;
 }
-#tabbar::-webkit-scrollbar { display: none; }
-.tab-btn {
-  flex: 0 0 auto; min-width: 62px;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: 2px; background: none; border: none; cursor: pointer;
-  color: var(--fg2); font-size: 10px; padding: 4px 2px;
-  transition: color 0.15s; -webkit-tap-highlight-color: transparent;
+.filter-pill {
+  padding: 6px 14px;
+  border: 1px solid #2a2a4a;
+  border-radius: 16px;
+  background: #16213e;
+  color: #b0b0c0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
 }
-.tab-btn .icon { font-size: 18px; line-height: 1; }
-.tab-btn.active { color: var(--accent); }
-.tab-btn.active .icon { transform: scale(1.1); }
-.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 8px; }
-.card-title { font-size: 11px; font-weight: 700; color: var(--fg2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
-.summary-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 8px; }
-.summary-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; text-align: center; }
-.summary-card .val { font-size: 18px; font-weight: 700; color: var(--fg); }
-.summary-card .lbl { font-size: 10px; color: var(--fg2); margin-top: 2px; }
-.summary-card .chg { font-size: 12px; font-weight: 600; margin-top: 2px; }
-.tbl-wrap { overflow-x: auto; border-radius: var(--radius); }
-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-th {
-  background: var(--panel2); color: var(--fg2); font-size: 10px; font-weight: 600;
-  text-transform: uppercase; padding: 6px 8px; text-align: left; white-space: nowrap;
-  cursor: pointer; user-select: none;
+.filter-pill:hover { border-color: #4fc3f7; }
+.filter-pill.active { background: #4fc3f7; color: #1a1a2e; border-color: #4fc3f7; font-weight: 600; }
+
+/* Pattern filter specific */
+.pattern-filter, .alert-filter, .basis-filter {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
 }
-th:hover { color: var(--fg); }
-td { padding: 7px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; color: var(--fg); }
-tr:last-child td { border-bottom: none; }
-tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
-tr.lb td { color: #22c55e; font-weight: 600; }
-tr.sb td { color: #ef4444; font-weight: 600; }
-tr.lu td { color: #f59e0b; }
-tr.sc td { color: #a855f7; }
-.sig { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 700; }
-.sig-lb { background: #064e1a; color: #22c55e; }
-.sig-sb { background: #4e0606; color: #ef4444; }
-.sig-lu { background: #4e3006; color: #f59e0b; }
-.sig-sc { background: #2e0650; color: #a855f7; }
-.up   { color: var(--green); }
-.down { color: var(--red); }
-.neu  { color: var(--fg2); }
-.bold { font-weight: 700; }
-.sec-head {
-  display: flex; align-items: center; gap: 8px;
-  margin: 10px 0 6px; font-size: 12px; font-weight: 700; color: var(--fg);
+
+/* Discount/Premium range filter */
+.range-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
 }
-.sec-head::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-.filter-bar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; }
-.filter-bar input, .filter-bar select {
-  background: var(--panel); border: 1px solid var(--border);
-  color: var(--fg); border-radius: 4px; padding: 5px 8px; font-size: 12px; outline: none;
+.range-filter label { font-size: 12px; color: #888; }
+.range-filter input[type="range"] {
+  flex: 1;
+  min-width: 120px;
+  accent-color: #4fc3f7;
 }
-.filter-bar input { flex: 1; min-width: 120px; }
-.filter-bar select { min-width: 110px; }
-#heatmap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 4px; margin-top: 8px; }
-.hm-tile {
-  border-radius: 6px; padding: 8px 6px; text-align: center; cursor: pointer;
-  transition: transform 0.1s; min-height: 70px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+.range-filter .range-value {
+  font-size: 12px;
+  color: #4fc3f7;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
 }
-.hm-tile:active { transform: scale(0.96); }
-.roll-bar { height: 4px; background: var(--border); border-radius: 2px; margin-top: 3px; overflow: hidden; }
-.roll-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.3s; }
-#sheet-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; }
-#sheet-overlay.show { display: block; }
-#bottom-sheet {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  background: var(--panel); border-radius: 16px 16px 0 0;
-  padding: 16px; max-height: 75vh; overflow-y: auto;
-  z-index: 201; transform: translateY(100%); transition: transform 0.25s ease;
+
+
+/* Sticky table header */
+.table-wrap .table-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: #0f3460;
 }
-#bottom-sheet.open { transform: translateY(0); }
-.sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 12px; }
-.sheet-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; }
-.sheet-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
-.sheet-row:last-child { border-bottom: none; }
-.sheet-row .lbl { color: var(--fg2); }
-.sheet-row .val { font-weight: 600; }
-.skeleton { background: linear-gradient(90deg, var(--panel) 25%, var(--panel2) 50%, var(--panel) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 4px; height: 14px; margin-bottom: 6px; }
-@keyframes shimmer { to { background-position: -200% 0; } }
-#toast { position: fixed; bottom: calc(var(--tab-h) + 12px); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--panel2); color: var(--fg); border: 1px solid var(--border); border-radius: 20px; padding: 6px 16px; font-size: 12px; opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; white-space: nowrap; z-index: 300; }
-#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-.error-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 200px; gap: 12px; color: var(--fg2); text-align: center; }
-.error-state .err-icon { font-size: 36px; }
-.retry-btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 8px 20px; cursor: pointer; font-size: 13px; font-weight: 600; }
-#ptr-spinner { display: none; text-align: center; padding: 8px; color: var(--accent); font-size: 18px; animation: spin 0.8s linear infinite; }
-#ptr-spinner.show { display: block; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.spark { display: inline-block; vertical-align: middle; }
-.ban-badge { display: inline-block; background: #7f1d1d; color: #fca5a5; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px; margin-right: 3px; }
-/* Strategy cards */
-.strat-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s; }
-.strat-card:active { border-color: var(--accent); }
-.strat-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
-.strat-sym { font-size: 14px; font-weight: 700; }
-.strat-type { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; }
-.strat-bullish { background: #064e1a; color: #22c55e; }
-.strat-bearish { background: #4e0606; color: #ef4444; }
-.strat-neutral { background: #1a2e42; color: #7ca8c8; }
-.strat-row { display: flex; gap: 12px; font-size: 11px; color: var(--fg2); flex-wrap: wrap; }
-.strat-row span { white-space: nowrap; }
-.strat-row strong { color: var(--fg); }
-.strat-conf { height: 3px; background: var(--border); border-radius: 2px; margin-top: 8px; overflow: hidden; }
-.strat-conf-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
-.scr-tag { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 600; background: var(--panel2); color: var(--fg2); margin-right: 3px; }
-.scr-hit { background: #064e1a; color: #22c55e; }
-.strat-section { margin-bottom: 14px; }
-.strat-section-head { font-size: 11px; font-weight: 700; color: var(--fg2); text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 0 6px; display: flex; align-items: center; gap: 8px; }
-.strat-section-head::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-@media (min-width: 600px) {
-  .summary-row { grid-template-columns: repeat(4, 1fr); }
-  #heatmap-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
-  #tabbar { max-width: 700px; margin: 0 auto; }
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  position: relative;
 }
-  </style>
+.table-scroll::-webkit-scrollbar { height: 6px; }
+.table-scroll::-webkit-scrollbar-track { background: #1a1a2e; }
+.table-scroll::-webkit-scrollbar-thumb { background: #4a4a6a; border-radius: 3px; }
+
+/* Responsive */
+@media(max-width:600px){
+  .table-header, .table-row { font-size:11px; padding:8px 6px; }
+  .col-symbol { font-size:12px; }
+  .card-count { font-size:24px; }
+}
+
+/* Sortable table headers */
+.table-header span {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  padding-right: 14px;
+}
+.table-header span:hover {
+  color: #4fc3f7;
+}
+.table-header span.sort-asc::after,
+.table-header span.sort-desc::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+}
+.table-header span.sort-asc::after {
+  border-bottom: 5px solid #4fc3f7;
+}
+.table-header span.sort-desc::after {
+  border-top: 5px solid #4fc3f7;
+}
+
+
+/* Mobile responsive table scrolling */
+@media (max-width: 768px) {
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid #2a2a4a;
+  }
+  .table-wrap {
+    min-width: max-content;
+    border: none;
+    border-radius: 0;
+  }
+  .table-header, .table-row {
+    min-width: max-content !important;
+    white-space: nowrap;
+  }
+  .table-header span, .table-row span {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .col-symbol {
+    position: sticky;
+    left: 0;
+    background: inherit;
+    z-index: 10;
+    box-shadow: 2px 0 4px rgba(0,0,0,0.3);
+  }
+  .table-header .col-symbol {
+    background: #0f3460;
+  }
+  .table-row .col-symbol {
+    background: #16213e;
+  }
+  .table-row:hover .col-symbol {
+    background: #1a1a3e;
+  }
+  .card-count {
+    font-size: 22px;
+  }
+  .card-label {
+    font-size: 10px;
+  }
+  .nav-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  .filter-pill, .filter-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+  .refresh-bar {
+    flex-wrap: wrap;
+  }
+  .range-filter {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .range-filter input[type="range"] {
+    width: 100%;
+  }
+  .modal-box {
+    max-width: 95vw;
+    margin: 10px;
+  }
+  .detail-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .detail-value {
+    font-size: 14px;
+  }
+  .detail-label {
+    font-size: 10px;
+  }
+  .basis-bar {
+    font-size: 9px;
+    height: 28px;
+  }
+  .ban-item, .ban-out, .alert-item {
+    padding: 8px 10px;
+  }
+  .alert-tag {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  .cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .card {
+    padding: 10px;
+  }
+  .card-count {
+    font-size: 20px;
+  }
+  .header h1 {
+    font-size: 14px;
+  }
+  .sync-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+  .nav {
+    padding: 8px 10px;
+    gap: 4px;
+  }
+  .nav-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+  .content {
+    padding: 10px;
+  }
+  .table-header span, .table-row span {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+  .col-signal {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .modal-box {
+    border-radius: 12px;
+  }
+}
+
+</style>
 </head>
 <body>
-  <div id="header">
-    <h1>NSE <span>F&amp;O</span> Tracker</h1>
-    <span id="data-ts">—</span>
-    <button id="theme-btn" onclick="toggleTheme()">☀️</button>
-    <button id="refresh-btn" onclick="loadData(true)">↻</button>
+<div class="header">
+  <h1>📊 NSE F&O Tracker</h1>
+  <span class="sync-badge pending" id="syncBadge">⏳ Loading...</span>
+</div>
+<div class="nav">
+  <button class="nav-btn active" onclick="showTab('dashboard')">📈 Dashboard</button>
+  <button class="nav-btn" onclick="showTab('pulse')">🌐 Market Pulse</button>
+  <button class="nav-btn" onclick="showTab('tracker')">🔍 Tracker</button>
+  <button class="nav-btn" onclick="showTab('oi')">🔥 OI Movers</button>
+  <button class="nav-btn" onclick="showTab('basis')">⚖️ Basis</button>
+  <button class="nav-btn" onclick="showTab('midmonth')">📅 Mid Month</button>
+  <button class="nav-btn" onclick="showTab('rollover')">🔄 Rollover</button>
+  <button class="nav-btn" onclick="showTab('ban')">🚫 Ban List</button>
+  <button class="nav-btn" onclick="showTab('options')">🎯 Options</button>
+</div>
+<div class="content" id="content">
+  <div class="loading"><div class="spinner"></div>Loading data...</div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="detailModal" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 id="modalSymbol">Symbol</h2>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
   </div>
-  <div id="offline-banner"></div>
-  <div id="ptr-spinner">↻</div>
-  <div id="content">
-    <div id="page-pulse"    class="page active"><div class="skeleton" style="height:80px;margin-bottom:8px"></div><div class="skeleton" style="height:40px;margin-bottom:8px"></div><div class="skeleton" style="height:300px"></div></div>
-    <div id="page-futures"  class="page"><div class="skeleton" style="height:60px;margin-bottom:8px"></div><div class="skeleton" style="height:400px"></div></div>
-    <div id="page-oi"       class="page"><div class="skeleton" style="height:60px;margin-bottom:8px"></div><div class="skeleton" style="height:400px"></div></div>
-    <div id="page-rollover" class="page"><div class="skeleton" style="height:120px;margin-bottom:8px"></div><div class="skeleton" style="height:300px"></div></div>
-    <div id="page-basis"    class="page"><div class="skeleton" style="height:60px;margin-bottom:8px"></div><div class="skeleton" style="height:300px"></div></div>
-    <div id="page-scanner"  class="page"><div class="skeleton" style="height:60px;margin-bottom:8px"></div><div class="skeleton" style="height:300px"></div></div>
-    <div id="page-screener" class="page"><div class="skeleton" style="height:60px;margin-bottom:8px"></div><div class="skeleton" style="height:300px"></div></div>
-  </div>
-  <div id="sheet-overlay"></div>
-  <div id="bottom-sheet"></div>
-  <div id="toast"></div>
-  <nav id="tabbar">
-    <button id="tab-pulse"    class="tab-btn active" onclick="switchTab('pulse')"><span class="icon">📊</span><span>Pulse</span></button>
-    <button id="tab-futures"  class="tab-btn" onclick="switchTab('futures')"><span class="icon">📈</span><span>Futures</span></button>
-    <button id="tab-oi"       class="tab-btn" onclick="switchTab('oi')"><span class="icon">🔥</span><span>OI</span></button>
-    <button id="tab-rollover" class="tab-btn" onclick="switchTab('rollover')"><span class="icon">🔄</span><span>Rollover</span></button>
-    <button id="tab-basis"    class="tab-btn" onclick="switchTab('basis')"><span class="icon">⚖️</span><span>Basis</span></button>
-    <button id="tab-scanner"  class="tab-btn" onclick="switchTab('scanner')"><span class="icon">🎯</span><span>Strategy</span></button>
-    <button id="tab-screener" class="tab-btn" onclick="switchTab('screener')"><span class="icon">🔎</span><span>Screener</span></button>
-  </nav>
-  <script>
-/* ══════════════════════════════════════════════════════════════════════
-   NSE F&O Tracker PWA — SDK Fintech — Session 3 (full rebuild)
-   Schema-bridge: normalises v2 snapshot into unified FO.N object
-   used by all tab renderers.
-   ══════════════════════════════════════════════════════════════════════ */
+</div>
 
-const DATA_URL  = './fo_snapshot_v3.json';
-const REFRESH_MS = 5 * 60 * 1000;
+<script>
+// ============================================
+// CONFIGURATION - EDIT THESE URLS
+// ============================================
+const CONFIG = {
+  // PRIMARY: GitHub raw URL (RECOMMENDED - same domain, no CORS, no API keys)
+  // Replace with your actual raw GitHub URL after pushing JSON to repo
+  githubRawUrl: 'https://raw.githubusercontent.com/capavankumarjagiasi/Fo-Tracker-v2/main/fo_snapshot.json',
+  
+  // FALLBACK: jsonbin.io (if you prefer external hosting)
+  // Replace YOUR_BIN_ID with your actual bin ID
+  jsonbinUrl: 'https://api.jsonbin.io/v3/b/YOUR_BIN_ID/latest',
+  
+  // Set to 'github' or 'jsonbin' to choose primary source
+  primarySource: 'github',
+  
+  // Date for display fallback
+  dateFmt: '05-06-2026'
+};
 
-window.FO = { data: null, N: null, loading: false, lastFetch: null, offline: false, tab: 'pulse' };
-const $ = id => document.getElementById(id);
+// ============================================
+// STATE
+// ============================================
+let appData = null;
+let currentTab = 'dashboard';
+let dashboardFilter = 'all';
 
-// ── Service Worker ────────────────────────────────────────────────────
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
-  navigator.serviceWorker.addEventListener('message', e => { if (e.data?.type === 'BG_REFRESH') loadData(); });
+const CACHE_VERSION = 'v2'; // bump this to bust stale cache
+
+// ============================================
+// DATA LOADING - NO GOOGLE DRIVE / NO OAUTH
+// ============================================
+async function loadData() {
+  const badge = document.getElementById('syncBadge');
+  badge.className = 'sync-badge pending';
+  badge.textContent = '⏳ Loading...';
+
+  try {
+    let data = null;
+    let source = '';
+    let errors = [];
+
+    // 1. Try localStorage cache first (only if same version)
+    const cached = localStorage.getItem('fo_snapshot_cache');
+    const cachedVer = localStorage.getItem('fo_snapshot_ver');
+    if (cached && cachedVer === CACHE_VERSION) {
+      try {
+        data = JSON.parse(cached);
+        source = 'cache';
+        appData = processData(data);
+        render();
+      } catch(e) { console.log('Cache parse failed'); }
+    }
+
+    // 2. Fetch fresh data from primary source
+    const urlsToTry = [];
+    if (CONFIG.primarySource === 'github') {
+      urlsToTry.push({ url: CONFIG.githubRawUrl + '?t=' + Date.now(), name: 'GitHub' });
+      urlsToTry.push({ url: CONFIG.jsonbinUrl, name: 'jsonbin' });
+    } else {
+      urlsToTry.push({ url: CONFIG.jsonbinUrl, name: 'jsonbin' });
+      urlsToTry.push({ url: CONFIG.githubRawUrl + '?t=' + Date.now(), name: 'GitHub' });
+    }
+
+    for (const src of urlsToTry) {
+      if (data && source === 'live') break;
+      try {
+        console.log('Trying:', src.name, src.url);
+        const resp = await fetch(src.url, { 
+          cache: 'no-store',
+          headers: src.name === 'jsonbin' ? { 'X-Master-Key': '' } : {}
+        });
+        if (resp.ok) {
+          let raw = await resp.json();
+          if (src.name === 'jsonbin' && raw.record) raw = raw.record;
+          data = raw;
+          source = 'live';
+          localStorage.setItem('fo_snapshot_cache', JSON.stringify(data));
+          localStorage.setItem('fo_snapshot_ver', CACHE_VERSION);
+          localStorage.setItem('fo_snapshot_time', new Date().toISOString());
+          console.log('Loaded from:', src.name);
+          break;
+        } else {
+          errors.push(`${src.name}: HTTP ${resp.status}`);
+        }
+      } catch(e) {
+        errors.push(`${src.name}: ${e.message}`);
+        console.log(src.name, 'failed:', e.message);
+      }
+    }
+
+    if (!data && !appData) {
+      throw new Error('No data available from any source. Errors: ' + errors.join('; '));
+    }
+
+    if (data) {
+      appData = processData(data);
+    }
+
+    badge.className = 'sync-badge';
+    const srcLabel = source === 'cache' ? 'Cached' : (CONFIG.primarySource === 'github' ? 'GitHub' : 'jsonbin');
+    badge.textContent = '✅ ' + srcLabel + ' ' + (appData?.meta?.date_fmt || CONFIG.dateFmt);
+    render();
+
+  } catch(err) {
+    console.error('Load error:', err);
+    badge.className = 'sync-badge error';
+    badge.textContent = '❌ Failed';
+    if (!appData) {
+      document.getElementById('content').innerHTML = `
+        <div class="empty">
+          <div style="font-size:48px;margin-bottom:16px;">📂</div>
+          <p>Unable to load data.</p>
+          <p style="color:#666;margin-top:8px;">Please ensure data file is accessible.</p>
+          <p style="color:#666;margin-top:8px;font-size:12px;">${err.message}</p>
+          <div style="margin-top:16px;">
+            <button class="refresh-btn" onclick="loadData()">🔄 Retry</button>
+          </div>
+        </div>`;
+    }
+  }
 }
 
-/* ══════════════════════════════════════════════════════════════════════
-   SCHEMA BRIDGE — converts v2 OR v3 snapshot → unified FO.N
-   v2 keys: futures_tracker, near_month, mid_month, far_month,
-            oi_movers, signal_breakdown, basis_summary, rollover, ban_list
-   v3 keys: futures[], market_summary, market_pulse, rollover{symbols[]}
-   ══════════════════════════════════════════════════════════════════════ */
-function normalise(raw) {
-  if (!raw) return null;
+// ============================================
+// DATA PROCESSING
+// ============================================
+function processData(raw) {
+  // Support both v1.0 (futures_tracker = near only) and v2.0 (has near_month)
+  const nearMonth  = raw.near_month  || raw.futures_tracker || [];
+  const midMonth   = raw.mid_month   || [];
+  const farMonth   = raw.far_month   || [];
+  const allExpiry  = raw.futures_tracker || nearMonth;
+  const rollover   = raw.rollover    || [];
 
-  // Detect schema version
-  const isV3 = !!raw.market_summary;
-  const isV2 = !!raw.futures_tracker || !!raw.near_month;
+  // tracker = near month for dashboard/OI/basis (backward compat)
+  const tracker = nearMonth;
 
-  if (isV3) return normaliseV3(raw);
-  if (isV2) return normaliseV2(raw);
-  return null; // unknown
-}
-
-function normaliseV2(d) {
-  // Field names verified against fo_snapshotv3.json audit 08-Jun-2026
-  const nearRaw = d.near_month || [];
-  const midRaw  = d.mid_month  || [];
-  const farRaw  = d.far_month  || [];
-  const banCurr = Array.isArray((d.ban_list||{}).current) ? d.ban_list.current : [];
-
-  function enrichRow(r, rank) {
-    const ltp      = parseFloat(r.ltp        || 0);
-    const spot     = parseFloat(r.spot       || 0);
-    const basis    = parseFloat(r.basis      || 0);
-    const basisP   = parseFloat(r.basis_pct  || (spot>0 ? (ltp-spot)/spot*100 : 0));
-    const fv       = parseFloat(r.fair_value || 0);
-    const fvd      = parseFloat(r.fv_diff    || 0);
-    const oi       = parseInt  (r.oi         || 0);
-    const oiChg    = parseInt  (r.oi_chg     || 0);
-    const prevOI   = oi - oiChg;
-    const oiChgP   = prevOI > 0 ? oiChg / prevOI * 100 : 0;
-    const oi5d     = parseFloat(r.oi_5d_pct    || 0);
-    const priceChg = parseFloat(r.price_chg     || 0);
-    const price5d  = parseFloat(r.price_5d_pct  || 0);
-    const conv     = parseFloat(r.conv_score    || 0);
-    const signal   = r.signal || '';
-    const dte      = parseInt (r.days_to_exp    || 0);
-    const lotSize  = parseInt (r.lot || r.lot_size || 1);
-    // chg_pct: derive from price_chg / (ltp - price_chg)
-    // Works for both STK (spot>0) and IDX (spot=0) rows
-    const prevLtp  = ltp - priceChg;
-    const chgPct   = prevLtp > 1 ? priceChg / prevLtp * 100 : 0;
-    return {
-      symbol:        r.symbol,
-      expiry:        r.expiry        || '',
-      expiry_rank:   r.expiry_rank   || rank,
-      type:          r.type          || 'STK',
-      ltp,  spot,
-      chg:           priceChg,
-      chg_pct:       +chgPct.toFixed(4),
-      oi,   oi_chg:  oiChg,
-      oi_chg_pct:    +oiChgP.toFixed(4),
-      oi_5d_pct:     oi5d,
-      price_5d_pct:  price5d,
-      basis,
-      basis_pct:     +basisP.toFixed(4),
-      fair_value:    fv,   fv_diff: fvd,
-      conv_score:    conv,
-      lot_size:      lotSize,   lot: lotSize,
-      days_to_exp:   dte,
-      trend:         signal,    signal,
-      pattern:       r.pattern  || '',
-      alerts:        r.alerts   || '',
-      ban_status:    banCurr.includes(r.symbol) ? 'ban' : (r.ban_status || 'normal'),
-      oi_history:    r.oi_history    || [],
-      price_history: r.price_history || [],
-      instrument:    (r.type||'STK')==='IDX' ? 'FUTIDX' : 'FUTSTK',
-    };
-  }
-
-  const near = nearRaw.map(r => enrichRow(r, 1));
-  const mid  = midRaw .map(r => enrichRow(r, 2));
-  const far  = farRaw .map(r => enrichRow(r, 3));
-  const futures = [...near, ...mid, ...far];
-
-  // ── market_summary ────────────────────────────────────────────────────
-  const meta      = d.meta      || {};
-  const expiries  = meta.expiries || {};
-
-  // Compute index prices from near_month IDX rows
-  function idxRow(sym) { return near.find(r => r.symbol===sym && r.type==='IDX'); }
-  const niftyR  = idxRow('NIFTY');
-  const bnfR    = idxRow('BANKNIFTY');
-  const mnR     = idxRow('MIDCPNIFTY');
-  const fnR     = idxRow('FINNIFTY');
-
-  const oimov   = d.oi_movers || {};
-  const sigBD   = d.signal_breakdown || {};
-  const advCount = near.filter(r=>r.chg_pct>0).length;
-  const decCount = near.filter(r=>r.chg_pct<0).length;
-
-  // oi_movers rows carry full data; enrich same way for consistent shape
-  const oimovG = (oimov.gainers||[]).map(r => enrichRow(r, 1));
-  const oimovL = (oimov.losers ||[]).map(r => enrichRow(r, 1));
-
-  const market_summary = {
-    nifty_ltp:         niftyR?.ltp        || null,
-    nifty_chg_pct:     niftyR?.chg_pct    || 0,
-    banknifty_ltp:     bnfR?.ltp          || null,
-    banknifty_chg_pct: bnfR?.chg_pct      || 0,
-    midcpnifty_ltp:    mnR?.ltp           || null,
-    finnifty_ltp:      fnR?.ltp           || null,
-    total_oi_cr:       null,
-    advance_decline:   { advances: advCount, declines: decCount, unchanged: near.length-advCount-decCount },
-    top_oi_gainers:    oimovG,
-    top_oi_losers:     oimovL,
-    top_price_gainers: [...near].sort((a,b)=>b.chg_pct-a.chg_pct).slice(0,5),
-    top_price_losers:  [...near].sort((a,b)=>a.chg_pct-b.chg_pct).slice(0,5),
-    ban_list:          banCurr,
-    ban_count:         banCurr.length,
-    out_of_ban:        Array.isArray((d.ban_list||{}).out_of_ban) ? d.ban_list.out_of_ban : [],
-  };
-
-  // ── heatmap from near ─────────────────────────────────────────────────
-  const heatmap = near.map(r=>({
-    symbol: r.symbol, chg_pct: r.chg_pct, oi_chg_pct: r.oi_chg_pct,
-    ltp: r.ltp, oi: r.oi, trend: r.trend, sector: r.sector||'Other',
-  }));
-  const market_pulse = { sectors: [], heatmap };
-
-  // ── rollover ──────────────────────────────────────────────────────────
-  const rvRaw = Array.isArray(d.rollover) ? d.rollover : (d.rollover?.symbols||[]);
-  const rvRows = rvRaw.map(r => ({
-    symbol:        r.symbol,
-    lot_size:      parseInt(r.lot||r.lot_size||1),
-    rollover_pct:  parseFloat(r.rolled_pct   || r.rollover_pct || 0),
-    oi_near:       parseInt  (r.near_oi      || r.oi_near      || 0),
-    oi_next:       parseInt  (r.mid_oi       || r.oi_next      || 0),
-    cost_of_carry: parseFloat(r.roll_cost_pct|| r.cost_of_carry|| 0),
-    bias:          r.bias || (parseFloat(r.rolled_pct||r.rollover_pct||0)>60?'Bullish':'Neutral'),
-    expiry_near:   r.near_expiry || r.expiry_near || expiries.near || '',
-    expiry_next:   r.mid_expiry  || r.expiry_next  || expiries.mid  || '',
-    days_to_near:  parseInt(r.days_to_near||0),
-    near_basis_pct:parseFloat(r.near_basis_pct||0),
-    mid_basis_pct: parseFloat(r.mid_basis_pct||0),
-  }));
-  const totalNear = rvRows.reduce((s,r)=>s+r.oi_near,0);
-  const totalNext = rvRows.reduce((s,r)=>s+r.oi_next,0);
-  const totalAll  = totalNear + totalNext;
-  const market_rollover_pct = totalAll>0 ? +(totalNext/totalAll*100).toFixed(2) : null;
-
-  // ── signal_breakdown → strategy_scanner ──────────────────────────────
-  // Build strategy scanner data from signal_breakdown hits
-  const STRAT_DEFS = {
-    OI_LONG:       { name:'OI Momentum Long',         emoji:'🔥', bias:'bullish', signals:['LB'] },
-    OI_SHORT:      { name:'OI Momentum Short',        emoji:'🐻', bias:'bearish', signals:['SB'] },
-    SQUEEZE:       { name:'Squeeze Play',             emoji:'🚀', bias:'bullish', signals:['SC'] },
-    BULL_TRAP:     { name:'Bull Trap Short',          emoji:'⚠️',  bias:'bearish', signals:['LU'] },
-    CONV_LONG:     { name:'Convergence Long',         emoji:'⏰', bias:'bullish', signals:['LB','SC'] },
-    CONV_SHORT:    { name:'Convergence Short',        emoji:'⏰', bias:'bearish', signals:['SB','LU'] },
-    ROLLOVER_LONG: { name:'Rollover Continuation',   emoji:'🔄', bias:'bullish', signals:['LB'] },
-  };
-
-  // Build a flat map of all signal rows keyed by symbol for scoring
-  const allSigRows = {};
-  Object.entries(sigBD).forEach(([sig, rows]) => {
-    (rows||[]).forEach(r => {
-      const sym = r.symbol;
-      if (!allSigRows[sym]) allSigRows[sym] = enrichRow(r, 1);
-    });
+  // Compute signal counts from near month
+  const signalCounts = { LB:0, SB:0, LU:0, SC:0 };
+  const signalItems  = { LB:[], SB:[], LU:[], SC:[] };
+  tracker.forEach(item => {
+    const sig = item.signal;
+    if (signalCounts.hasOwnProperty(sig)) {
+      signalCounts[sig]++;
+      signalItems[sig].push(item);
+    }
   });
 
-  // Also enrich from basis_summary for conv candidates
-  (d.basis_summary||[]).forEach(r => {
-    const sym = r.symbol;
-    if (!allSigRows[sym]) allSigRows[sym] = enrichRow(r, 1);
+  // Categorize basis
+  const basisCats = { dd:[], d:[], p:[], pm:[], dp:[] };
+  tracker.forEach(item => {
+    const bp = item.basis_pct;
+    if (bp === null || bp === undefined) return;
+    if (bp < -1) basisCats.dd.push(item);
+    else if (bp < 0) basisCats.d.push(item);
+    else if (bp === 0) basisCats.p.push(item);
+    else if (bp <= 1) basisCats.pm.push(item);
+    else basisCats.dp.push(item);
   });
 
-  function scoreRow(r) {
-    const sig   = r.signal||r.trend||'';
-    const bp    = parseFloat(r.basis_pct||0);
-    const conv  = parseFloat(r.conv_score||0);
-    const oi5d  = parseFloat(r.oi_5d_pct||0);
-    const dte   = parseInt(r.days_to_exp||99);
-    const pat   = String(r.pattern||'');
-    const ban   = r.ban_status||'normal';
-    const scores = {};
-
-    // OI_LONG
-    if (sig==='LB') {
-      let s=2;
-      if (pat.includes('Strong')) s+=2;
-      if (oi5d>5) s+=2;
-      if (bp>=-0.5 && bp<=1.0) s+=1;
-      if (ban==='normal') s+=1;
-      if (conv<2) s+=1;
-      scores.OI_LONG = Math.min(s,10);
+  // Extract alerts from near month
+  const alerts = [];
+  tracker.forEach(item => {
+    if (item.alerts && item.alerts.trim()) {
+      const alertList = item.alerts.split('|').map(a => a.trim()).filter(Boolean);
+      alertList.forEach(a => alerts.push({ symbol: item.symbol, alert: a, signal: item.signal }));
     }
-    // OI_SHORT
-    if (sig==='SB') {
-      let s=2;
-      if (pat.includes('Strong')) s+=2;
-      if (oi5d>5) s+=2;
-      if (bp>0) s+=1;
-      if (ban==='normal') s+=1;
-      if (conv<2) s+=1;
-      scores.OI_SHORT = Math.min(s,10);
-    }
-    // SQUEEZE
-    if (sig==='SC') {
-      let s=2;
-      if (pat.includes('Squeeze')||pat.includes('SC')) s+=3;
-      if ((r.oi_chg||0)<0) s+=1;
-      if (bp<0) s+=1;
-      scores.SQUEEZE = Math.min(s,9);
-    }
-    // BULL_TRAP
-    if (sig==='LU') {
-      let s=2;
-      if (pat.includes('Trap')||pat.includes('LU')) s+=2;
-      if ((r.oi_chg||0)<0) s+=2;
-      if (bp<0) s+=1;
-      scores.BULL_TRAP = Math.min(s,8);
-    }
-    // CONV_LONG (deep discount)
-    if (bp < -1.0 && r.spot>0) {
-      let s=2;
-      if (conv>7) s+=4; else if (conv>4) s+=2;
-      if (dte<5) s+=3; else if (dte<10) s+=2;
-      if (sig!=='SB') s+=1;
-      scores.CONV_LONG = Math.min(s,10);
-    }
-    // CONV_SHORT (deep premium)
-    if (bp > 1.0 && r.spot>0) {
-      let s=2;
-      if (conv>7) s+=4; else if (conv>4) s+=2;
-      if (dte<5) s+=3; else if (dte<10) s+=2;
-      if (sig!=='LB') s+=1;
-      scores.CONV_SHORT = Math.min(s,10);
-    }
-    return scores;
-  }
-
-  function explain(r, code) {
-    const bp=parseFloat(r.basis_pct||0), conv=parseFloat(r.conv_score||0);
-    const dte=parseInt(r.days_to_exp||0), oi5d=parseFloat(r.oi_5d_pct||0);
-    const pat=String(r.pattern||'').replace(/[🔥🐻🚀⚠]/g,'').trim();
-    const sig=r.signal||r.trend||'';
-    if (code==='OI_LONG')   return [sig+' signal', pat, oi5d>5?'OI 5d +'+oi5d.toFixed(0)+'%':'', 'Basis '+bp.toFixed(2)+'%'].filter(Boolean).join(', ');
-    if (code==='OI_SHORT')  return [sig+' signal', pat, oi5d>5?'OI 5d +'+oi5d.toFixed(0)+'%':'', 'Basis '+bp.toFixed(2)+'%'].filter(Boolean).join(', ');
-    if (code==='SQUEEZE')   return 'Short covering, Basis '+bp.toFixed(2)+'%'+(pat?' — '+pat:'');
-    if (code==='BULL_TRAP') return 'Bull Trap, OI falling, Basis '+bp.toFixed(2)+'%';
-    if (code==='CONV_LONG') return 'Futures at '+bp.toFixed(2)+'% discount, Conv★='+conv.toFixed(1)+', '+dte+'d to expiry';
-    if (code==='CONV_SHORT')return 'Futures at +'+bp.toFixed(2)+'% premium, Conv★='+conv.toFixed(1)+', '+dte+'d to expiry';
-    return 'Score '+code;
-  }
-
-  const strategies = {};
-  Object.entries(STRAT_DEFS).forEach(([code, meta]) => {
-    const hits = [];
-    Object.values(allSigRows).forEach(r => {
-      const s = scoreRow(r);
-      if (s[code] > 0) hits.push({ ...r, score: s[code], explanation: explain(r, code) });
-    });
-    hits.sort((a,b)=>b.score-a.score);
-    strategies[code] = { name: meta.name, emoji: meta.emoji, bias: meta.bias, hits: hits.slice(0,10) };
+  });
+  const alertPriority = { '🔻Hi Disc': 0, '⚡OI Spike': 1, '🚀Squeeze': 2, '⚠Bull Trap': 3, '🔄Rev↓': 4, '🔄Rev↑': 5 };
+  alerts.sort((a, b) => {
+    const pa = alertPriority[a.alert] ?? 99;
+    const pb = alertPriority[b.alert] ?? 99;
+    return pa - pb || a.symbol.localeCompare(b.symbol);
   });
 
-  const strategy_scanner = { last_run: meta.date_fmt||meta.generated_at||'', strategies };
+  const banList = tracker.filter(i => i.ban_status === 'banned');
 
-  // ── options_screener passthrough ──────────────────────────────────────
-  const options_screener = d.options_screener || { straddle:[], covered_call:[], last_run:'', data_mode:'EOD Bhavcopy' };
+  // Symbol lookup across ALL expiries for detail modal
+  const allSymbolMap = {};
+  allExpiry.forEach(i => { allSymbolMap[i.symbol] = i; });
 
-  // ── meta normalise ────────────────────────────────────────────────────
-  const normMeta = {
-    generated_at: meta.generated_at || '',
-    date_fmt:     meta.date_fmt || (meta.date ? meta.date.slice(0,2)+'-'+meta.date.slice(2,4)+'-'+meta.date.slice(4) : ''),
-    date:         meta.date || '',
-    app_version:  meta.version || '2.0',
-    app_name:     meta.app    || 'SDK Fintech',
-    has_options:  false,
-    expiries,
-    ban_count:    banCurr.length,
-  };
+  // Signal breakdown (for Market Pulse)
+  const signalBreakdown = raw.signal_breakdown || {};
+
+  // Options screener
+  const optionsScreener = raw.options_screener || {};
+  const optionsSummary  = raw.options_summary  || {};
 
   return {
-    _schema: 'v2',
-    meta:             normMeta,
-    futures,
-    market_summary,
-    market_pulse,
-    rollover:         { market_rollover_pct, symbols: rvRows },
-    options_summary:  { as_of_date: null, indices: {}, stocks: [] },
-    strategy_scanner,
-    options_screener,
-    watchlist:        d.watchlist  || [],
-    alerts:           d.alerts     || [],
+    meta:        raw.meta || {},
+    tracker,           // near month — used by dashboard, OI, basis
+    nearMonth,
+    midMonth,
+    farMonth,
+    allExpiry,
+    rollover,
+    signalCounts,
+    signalItems,
+    basisCats,
+    basisSummary: raw.basis_summary || [],
+    oiMovers:    raw.oi_movers || { gainers:[], losers:[] },
+    alerts,
+    banList,
+    allSymbolMap,
+    expiries:    raw.meta?.expiries || {},
+    signalBreakdown,
+    optionsScreener,
+    optionsSummary,
   };
 }
 
-function normaliseV3(d) {
-  // v3 schema already matches expected structure — just pass through
-  // with light enrichment for missing fields
-  const futures = (d.futures||[]).map(r => ({
-    ...r,
-    lot: r.lot_size || r.lot || 1,
-    signal: r.trend || r.signal || '',
-  }));
-  return { _schema: 'v3', ...d, futures };
-}
+// ============================================
+// RENDERING
+// ============================================
+function render() {
+  if (!appData) return;
+  const el = document.getElementById('content');
 
-// ── Data loader ───────────────────────────────────────────────────────
-async function loadData(force = false) {
-  if (FO.loading) return;
-  FO.loading = true;
-  showPTR(true);
-  try {
-    const url = force ? DATA_URL + '?t=' + Date.now() : DATA_URL;
-    const resp = await fetch(url, { cache: force ? 'no-cache' : 'default' });
-    if (resp.ok) {
-      const raw     = await resp.json();
-      FO.data       = raw;
-      FO.N          = normalise(raw);
-      FO.lastFetch  = new Date();
-      FO.offline    = false;
-      setOfflineBanner(false);
-      updateTimestamp();
-      renderCurrentTab();
-      showToast('Updated · ' + fmt_time(FO.lastFetch));
-    } else { throw new Error('HTTP ' + resp.status); }
-  } catch (err) {
-    try {
-      const cached = await caches.match(DATA_URL);
-      if (cached) {
-        const raw  = await cached.json();
-        FO.data    = raw;
-        FO.N       = normalise(raw);
-        FO.offline = true;
-        setOfflineBanner(true, FO.N?.meta?.date_fmt);
-        updateTimestamp();
-        renderCurrentTab();
-      } else { showError(); }
-    } catch { showError(); }
-  } finally { FO.loading = false; showPTR(false); }
-}
-
-// ── Tab router ────────────────────────────────────────────────────────
-const TAB_RENDERERS = {
-  pulse:    () => window.renderPulse    && renderPulse(FO.N),
-  futures:  () => window.renderFutures  && renderFutures(FO.N),
-  oi:       () => window.renderOI       && renderOI(FO.N),
-  rollover: () => window.renderRollover && renderRollover(FO.N),
-  basis:    () => window.renderBasis    && renderBasis(FO.N),
-  scanner:  () => window.renderScanner  && renderScanner(FO.N),
-  screener: () => window.renderScreener && renderScreener(FO.N),
-};
-const TABS = ['pulse','futures','oi','rollover','basis','scanner','screener'];
-
-function switchTab(name) {
-  FO.tab = name;
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  const pg  = $('page-' + name);  if (pg)  pg.classList.add('active');
-  const btn = $('tab-'  + name);  if (btn) btn.classList.add('active');
-  renderCurrentTab();
-}
-function renderCurrentTab() {
-  if (!FO.N) return;
-  const fn = TAB_RENDERERS[FO.tab];
-  if (fn) try { fn(); } catch(e) { console.error('Render error ['+FO.tab+']:', e); }
-}
-
-// Swipe
-let touchX0 = 0;
-document.addEventListener('touchstart', e => { touchX0 = e.touches[0].clientX; }, {passive:true});
-document.addEventListener('touchend',   e => {
-  const dx = e.changedTouches[0].clientX - touchX0;
-  if (Math.abs(dx) < 60) return;
-  const idx = TABS.indexOf(FO.tab);
-  if (dx < 0 && idx < TABS.length-1) switchTab(TABS[idx+1]);
-  if (dx > 0 && idx > 0)             switchTab(TABS[idx-1]);
-}, {passive:true});
-
-// Pull-to-refresh
-let ptY0 = 0, pulling = false;
-document.addEventListener('touchstart', e => { const pg=document.querySelector('.page.active'); if(pg&&pg.scrollTop===0){ptY0=e.touches[0].clientY;pulling=true;} },{passive:true});
-document.addEventListener('touchend',   e => { if(pulling&&e.changedTouches[0].clientY-ptY0>60) loadData(true); pulling=false; },{passive:true});
-
-// ── Bottom sheet ──────────────────────────────────────────────────────
-function openSheet(html, title) {
-  const sheet = $('bottom-sheet');
-  sheet.innerHTML = `<div class="sheet-handle"></div><div class="sheet-title">${title}</div>${html}`;
-  $('sheet-overlay').classList.add('show');
-  requestAnimationFrame(() => sheet.classList.add('open'));
-}
-function closeSheet() { $('sheet-overlay').classList.remove('show'); $('bottom-sheet').classList.remove('open'); }
-document.getElementById('sheet-overlay').addEventListener('click', closeSheet);
-
-// ── Helpers ───────────────────────────────────────────────────────────
-function fmt_inr(v) { if(v==null||isNaN(v))return'—'; const n=parseFloat(v); if(Math.abs(n)>=1e7)return'₹'+(n/1e7).toFixed(2)+'Cr'; if(Math.abs(n)>=1e5)return'₹'+(n/1e5).toFixed(2)+'L'; return'₹'+n.toLocaleString('en-IN',{maximumFractionDigits:2}); }
-function fmt_oi(v)  { if(v==null)return'—'; const n=parseInt(v); if(n>=1e7)return(n/1e7).toFixed(2)+'Cr'; if(n>=1e5)return(n/1e5).toFixed(2)+'L'; if(n>=1e3)return(n/1e3).toFixed(1)+'K'; return n.toString(); }
-function fmt_pct(v) { if(v==null||isNaN(v))return'—'; const n=parseFloat(v); const cl=n>0?'up':n<0?'down':'neu'; return`<span class="${cl}">${n>=0?'+':''}${n.toFixed(2)}%</span>`; }
-function fmt_time(d){ return d.toTimeString().slice(0,5); }
-function sig_badge(s){ if(!s)return''; const m={LB:'lb',SB:'sb',LU:'lu',SC:'sc'}; return`<span class="sig sig-${m[s]||''}">${s}</span>`; }
-function row_cls(s)  { return s?s.toLowerCase():''; }
-function ban_badge(r){ return r?.ban_status==='ban'?'<span class="ban-badge">BAN</span>':''; }
-window.fmt_inr=fmt_inr; window.fmt_oi=fmt_oi; window.fmt_pct=fmt_pct;
-window.sig_badge=sig_badge; window.row_cls=row_cls; window.ban_badge=ban_badge;
-window.openSheet=openSheet; window.closeSheet=closeSheet;
-
-function makeSortable(tableId) {
-  const tbl=document.getElementById(tableId); if(!tbl)return;
-  let sc=-1,sa=true;
-  tbl.querySelectorAll('th').forEach((th,i)=>{
-    th.addEventListener('click',()=>{
-      const tbody=tbl.querySelector('tbody');
-      const rows=Array.from(tbody.querySelectorAll('tr'));
-      if(sc===i)sa=!sa;else{sc=i;sa=true;}
-      rows.sort((a,b)=>{
-        const av=a.cells[i]?.innerText.replace(/[₹%+,]/g,'').trim()||'';
-        const bv=b.cells[i]?.innerText.replace(/[₹%+,]/g,'').trim()||'';
-        const an=parseFloat(av),bn=parseFloat(bv);
-        if(!isNaN(an)&&!isNaN(bn))return sa?an-bn:bn-an;
-        return sa?av.localeCompare(bv):bv.localeCompare(av);
-      });
-      rows.forEach(r=>tbody.appendChild(r));
-      tbl.querySelectorAll('th').forEach((h,j)=>{
-        h.textContent=h.textContent.replace(' ↑','').replace(' ↓','');
-        if(j===i)h.textContent+=sa?' ↑':' ↓';
-      });
-    });
-  });
-}
-window.makeSortable=makeSortable;
-
-function setOfflineBanner(on, date) {
-  const b=$('offline-banner');
-  if(on){b.textContent='⚠ Offline — cached data'+(date?' as of '+date:'');b.classList.add('show');$('content').classList.add('has-banner');}
-  else{b.classList.remove('show');$('content').classList.remove('has-banner');}
-}
-function updateTimestamp() {
-  const m=FO.N?.meta;
-  if(m) $('data-ts').textContent=(m.date_fmt||m.date||'')+(FO.lastFetch?' · '+fmt_time(FO.lastFetch):'');
-}
-function showPTR(on){ const s=$('ptr-spinner'); if(s)s.classList.toggle('show',on); }
-function showToast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
-function showError() {
-  ['page-pulse','page-futures','page-oi','page-rollover','page-basis','page-scanner','page-screener'].forEach(id=>{
-    const p=$(id);
-    if(p&&!p.querySelector('.error-state'))
-      p.innerHTML=`<div class="error-state"><div class="err-icon">⚠</div><div>Could not load data</div><button class="retry-btn" onclick="loadData(true)">Retry</button></div>`;
-  });
-}
-function toggleTheme() {
-  document.body.classList.toggle('light');
-  $('theme-btn').textContent=document.body.classList.contains('light')?'🌙':'☀️';
-  localStorage.setItem('fo-theme',document.body.classList.contains('light')?'light':'dark');
-}
-if(localStorage.getItem('fo-theme')==='light'){document.body.classList.add('light');const tb=$('theme-btn');if(tb)tb.textContent='🌙';}
-setInterval(()=>loadData(),REFRESH_MS);
-document.addEventListener('DOMContentLoaded',()=>{switchTab('pulse');loadData();});
-
-/* ══════════════════════════════════════════════════════════════════════
-   PULSE TAB
-   ══════════════════════════════════════════════════════════════════════ */
-function renderPulse(data) {
-  const pg=document.getElementById('page-pulse'); if(!data||!pg)return;
-  const ms   = data.market_summary || {};
-  const ad   = ms.advance_decline  || {};
-  const hm   = (data.market_pulse  || {}).heatmap || [];
-  const ban  = ms.ban_list || [];
-  const near = (data.futures||[]).filter(r=>r.expiry_rank===1);
-  const sigCount={LB:0,SB:0,LU:0,SC:0};
-  near.forEach(r=>{ if(r.trend&&sigCount[r.trend]!==undefined)sigCount[r.trend]++; });
-  const nUp=(ms.nifty_chg_pct||0)>=0, bUp=(ms.banknifty_chg_pct||0)>=0;
-  const sorted=[...near].sort((a,b)=>(b.chg_pct||0)-(a.chg_pct||0));
-  const gainers5=sorted.slice(0,5), losers5=sorted.slice(-5).reverse();
-
-  pg.innerHTML=`
-    <div class="summary-row">
-      <div class="summary-card">
-        <div class="lbl">NIFTY</div>
-        <div class="val">${ms.nifty_ltp?'₹'+Number(ms.nifty_ltp).toLocaleString('en-IN',{maximumFractionDigits:0}):'—'}</div>
-        <div class="chg ${nUp?'up':'down'}">${nUp?'+':''}${(ms.nifty_chg_pct||0).toFixed(2)}%</div>
-      </div>
-      <div class="summary-card">
-        <div class="lbl">BANKNIFTY</div>
-        <div class="val">${ms.banknifty_ltp?'₹'+Number(ms.banknifty_ltp).toLocaleString('en-IN',{maximumFractionDigits:0}):'—'}</div>
-        <div class="chg ${bUp?'up':'down'}">${bUp?'+':''}${(ms.banknifty_chg_pct||0).toFixed(2)}%</div>
-      </div>
-      <div class="summary-card">
-        <div class="lbl">Adv / Dec</div>
-        <div class="val"><span class="up">${ad.advances||0}</span> / <span class="down">${ad.declines||0}</span></div>
-        <div class="chg neu">Unch: ${ad.unchanged||0}</div>
-      </div>
-      <div class="summary-card">
-        <div class="lbl">F&amp;O Ban</div>
-        <div class="val down">${ban.length}</div>
-        <div class="chg neu" style="font-size:9px">${ban.slice(0,3).join(', ')||'None'}</div>
-      </div>
-    </div>
-    <div class="sec-head">Signal Breakdown</div>
-    <div class="summary-row" style="grid-template-columns:repeat(4,1fr)">
-      <div class="summary-card" style="border-color:#064e1a"><div class="lbl">Long Buildup</div><div class="val up bold">${sigCount.LB}</div><div style="font-size:9px;color:var(--fg2)">Price↑ OI↑</div></div>
-      <div class="summary-card" style="border-color:#4e0606"><div class="lbl">Short Buildup</div><div class="val down bold">${sigCount.SB}</div><div style="font-size:9px;color:var(--fg2)">Price↓ OI↑</div></div>
-      <div class="summary-card" style="border-color:#4e3006"><div class="lbl">Long Unwind</div><div class="val bold" style="color:var(--amber)">${sigCount.LU}</div><div style="font-size:9px;color:var(--fg2)">Price↓ OI↓</div></div>
-      <div class="summary-card" style="border-color:#2e0650"><div class="lbl">Short Cover</div><div class="val bold" style="color:var(--purple)">${sigCount.SC}</div><div style="font-size:9px;color:var(--fg2)">Price↑ OI↓</div></div>
-    </div>
-    <div class="sec-head">Top Gainers</div>
-    <div class="tbl-wrap"><table><thead><tr><th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI Chg%</th><th>Sig</th></tr></thead>
-    <tbody>${gainers5.map(r=>`<tr class="${row_cls(r.trend)}" onclick='showSymbolSheet(${JSON.stringify(r)})'>
-      <td>${ban_badge(r)}<strong>${r.symbol}</strong></td>
-      <td>₹${(r.ltp||0).toFixed(2)}</td>
-      <td class="${(r.chg_pct||0)>=0?'up':'down'}">${(r.chg_pct||0)>=0?'+':''}${(r.chg_pct||0).toFixed(2)}%</td>
-      <td class="${(r.oi_chg_pct||0)>=0?'up':'down'}">${(r.oi_chg_pct||0)>=0?'+':''}${(r.oi_chg_pct||0).toFixed(2)}%</td>
-      <td>${sig_badge(r.trend)}</td></tr>`).join('')}</tbody></table></div>
-    <div class="sec-head">Top Losers</div>
-    <div class="tbl-wrap"><table><thead><tr><th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI Chg%</th><th>Sig</th></tr></thead>
-    <tbody>${losers5.map(r=>`<tr class="${row_cls(r.trend)}" onclick='showSymbolSheet(${JSON.stringify(r)})'>
-      <td>${ban_badge(r)}<strong>${r.symbol}</strong></td>
-      <td>₹${(r.ltp||0).toFixed(2)}</td>
-      <td class="${(r.chg_pct||0)>=0?'up':'down'}">${(r.chg_pct||0)>=0?'+':''}${(r.chg_pct||0).toFixed(2)}%</td>
-      <td class="${(r.oi_chg_pct||0)>=0?'up':'down'}">${(r.oi_chg_pct||0)>=0?'+':''}${(r.oi_chg_pct||0).toFixed(2)}%</td>
-      <td>${sig_badge(r.trend)}</td></tr>`).join('')}</tbody></table></div>
-    <div class="sec-head">Heat Map
-      <select id="hm-filter" style="margin-left:auto;font-size:11px;background:var(--panel);border:1px solid var(--border);color:var(--fg);border-radius:4px;padding:2px 6px">
-        <option value="rank50">Top 50</option><option value="all">All</option><option value="g25l25">Top 25G+25L</option>
-      </select>
-    </div>
-    <div id="heatmap-grid"></div>`;
-
-  const hmRows = hm.length ? hm : near;
-  renderHeatmap(hmRows);
-  document.getElementById('hm-filter').addEventListener('change',e=>renderHeatmap(hmRows,e.target.value));
-}
-
-function renderHeatmap(rows, mode='rank50') {
-  const grid=document.getElementById('heatmap-grid'); if(!grid)return;
-  function sc(r){ return (parseFloat(r.chg_pct||0)*0.5)+(parseFloat(r.oi_chg_pct||0)*0.5); }
-  const scored=[...rows].map(r=>({...r,_sc:sc(r)})).sort((a,b)=>b._sc-a._sc);
-  let heat;
-  if(mode==='all') heat=scored;
-  else if(mode==='g25l25'){ const byP=[...rows].sort((a,b)=>(b.chg_pct||0)-(a.chg_pct||0)); heat=[...byP.slice(0,25),...byP.slice(-25).reverse()]; }
-  else heat=scored.slice(0,50);
-
-  function ts(s,p){ const a=Math.abs(s); if(a<1)return{bg:'#1a1f2e',fg:p>=0?'#22c55e':'#ef4444',brd:'#2a3040'}; if(s>=5)return{bg:'#004d00',fg:'#fff',brd:'#006600'}; if(s>=3)return{bg:'#006600',fg:'#fff',brd:'#008800'}; if(s>=1)return{bg:'#1a8c1a',fg:'#fff',brd:'#22aa22'}; if(s>=-3)return{bg:'#991a1a',fg:'#fff',brd:'#bb2222'}; if(s>=-5)return{bg:'#cc0000',fg:'#fff',brd:'#dd1111'}; return{bg:'#800000',fg:'#fff',brd:'#990000'}; }
-  const SC2={LB:'#00e676',SB:'#ff5252',LU:'#ffab40',SC:'#ce93d8'};
-  grid.innerHTML=heat.map((r,i)=>{
-    const s=r._sc||sc(r),p=parseFloat(r.chg_pct||0),o=parseFloat(r.oi_chg_pct||0);
-    const l=parseFloat(r.ltp||0),{bg,fg,brd}=ts(s,p),top=i<10;
-    const sig=r.trend||r.signal||'';
-    const rb=top?`<div style="position:absolute;top:3px;left:3px;background:#1a7abf;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px">#${i+1}</div>`:'';
-    const sc2=SC2[sig]||'';
-    const sb2=sig&&sc2?`<div style="position:absolute;bottom:3px;left:3px;background:${sc2};color:#000;font-size:${top?9:7}px;font-weight:700;padding:1px ${top?6:4}px;border-radius:3px">${sig}</div>`:'';
-    return `<div class="hm-tile" style="background:${bg};border:1px solid ${brd};min-height:${top?110:52}px;position:relative;color:${fg}" onclick='showSymbolSheet(${JSON.stringify({...r,signal:sig})})'>
-      ${rb}
-      <div style="font-size:11px;font-weight:700">${r.symbol}</div>
-      <div style="font-size:${top?14:10}px;font-weight:700">₹${l>=10000?l.toFixed(0):l.toFixed(1)}</div>
-      <div style="font-size:${top?10:8}px">${p>=0?'+':''}${p.toFixed(2)}%</div>
-      <div style="font-size:8px;color:${o>=0?'#00e676':'#ff5252'}">OI ${o>=0?'+':''}${o.toFixed(1)}%</div>
-      ${sb2}</div>`;
-  }).join('');
-}
-
-function showSymbolSheet(r) {
-  if(typeof r==='string')try{r=JSON.parse(r);}catch{return;}
-  const p=parseFloat(r.chg_pct||0),o=parseFloat(r.oi_chg_pct||0);
-  openSheet(`
-    <div class="sheet-row"><span class="lbl">LTP</span><span class="val bold">₹${(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Spot</span><span class="val">₹${(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Price Chg%</span><span class="val ${p>=0?'up':'down'} bold">${p>=0?'+':''}${p.toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">OI Chg%</span><span class="val ${o>=0?'up':'down'}">${o>=0?'+':''}${o.toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Open Interest</span><span class="val">${fmt_oi(r.oi)} lots</span></div>
-    <div class="sheet-row"><span class="lbl">Basis%</span><span class="val">${(r.basis_pct||0).toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Fair Value</span><span class="val">₹${(r.fair_value||0).toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">Conv Score</span><span class="val">${(r.conv_score||0).toFixed(1)}</span></div>
-    <div class="sheet-row"><span class="lbl">Signal</span><span class="val">${sig_badge(r.trend||r.signal)}</span></div>
-    <div class="sheet-row"><span class="lbl">Pattern</span><span class="val">${r.pattern||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Days to Exp</span><span class="val">${r.days_to_exp||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Expiry</span><span class="val">${r.expiry||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Lot Size</span><span class="val">${r.lot_size||r.lot||'—'}</span></div>
-    ${r.alerts?`<div class="sheet-row"><span class="lbl">Alerts</span><span class="val">${r.alerts}</span></div>`:''}
-  `,(r.ban_status==='ban'?'🚫 ':'')+r.symbol);
-}
-window.showSymbolSheet=showSymbolSheet;
-window.renderPulse=renderPulse;
-
-/* ══════════════════════════════════════════════════════════════════════
-   FUTURES TAB
-   ══════════════════════════════════════════════════════════════════════ */
-function renderFutures(data) {
-  const pg=document.getElementById('page-futures'); if(!data||!pg)return;
-  const near=(data.futures||[]).filter(r=>r.expiry_rank===1);
-
-  pg.innerHTML=`
-    <div class="filter-bar">
-      <input id="fut-search" type="search" placeholder="Search symbol…">
-      <select id="fut-signal">
-        <option value="">All Signals</option>
-        <option value="LB">Long Buildup</option>
-        <option value="SB">Short Buildup</option>
-        <option value="LU">Long Unwinding</option>
-        <option value="SC">Short Covering</option>
-      </select>
-      <select id="fut-sort">
-        <option value="oi_desc">OI ↓</option>
-        <option value="price_desc">Chg% ↓</option>
-        <option value="price_asc">Chg% ↑</option>
-        <option value="basis_desc">Basis% ↓</option>
-        <option value="conv_desc">Conv ↓</option>
-      </select>
-    </div>
-    <div id="fut-count" style="font-size:11px;color:var(--fg2);margin-bottom:6px"></div>
-    <div class="tbl-wrap"><table id="tbl-futures">
-      <thead><tr><th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI</th><th>OI Chg%</th><th>Basis%</th><th>Conv</th><th>Sig</th></tr></thead>
-      <tbody id="fut-tbody"></tbody>
-    </table></div>`;
-
-  function apply() {
-    const q=document.getElementById('fut-search').value.trim().toUpperCase();
-    const sg=document.getElementById('fut-signal').value;
-    const so=document.getElementById('fut-sort').value;
-    let rows=near.filter(r=>(!q||(r.symbol||'').includes(q))&&(!sg||r.trend===sg));
-    rows.sort((a,b)=>{
-      if(so==='price_desc')return(b.chg_pct||0)-(a.chg_pct||0);
-      if(so==='price_asc') return(a.chg_pct||0)-(b.chg_pct||0);
-      if(so==='basis_desc')return(b.basis_pct||0)-(a.basis_pct||0);
-      if(so==='conv_desc') return(b.conv_score||0)-(a.conv_score||0);
-      return(b.oi||0)-(a.oi||0);
-    });
-    document.getElementById('fut-count').textContent=rows.length+' symbols';
-    document.getElementById('fut-tbody').innerHTML=rows.map(r=>{
-      const p=parseFloat(r.chg_pct||0),o=parseFloat(r.oi_chg_pct||0),bp=parseFloat(r.basis_pct||0);
-      return`<tr class="${row_cls(r.trend)}" onclick='showFutSheet(${JSON.stringify(r)})'>
-        <td>${ban_badge(r)}<strong>${r.symbol}</strong></td>
-        <td>₹${(r.ltp||0).toFixed(2)}</td>
-        <td class="${p>=0?'up':'down'}">${p>=0?'+':''}${p.toFixed(2)}%</td>
-        <td>${fmt_oi(r.oi)}</td>
-        <td class="${o>=0?'up':'down'}">${o>=0?'+':''}${o.toFixed(2)}%</td>
-        <td class="${bp>0.5?'up':bp<-0.5?'down':'neu'}">${bp>=0?'+':''}${bp.toFixed(2)}%</td>
-        <td>${(r.conv_score||0).toFixed(1)}</td>
-        <td>${sig_badge(r.trend)}</td></tr>`;
-    }).join('');
-    makeSortable('tbl-futures');
+  switch(currentTab) {
+    case 'dashboard': renderDashboard(el); break;
+    case 'pulse': renderPulse(el); break;
+    case 'tracker': renderTracker(el); break;
+    case 'oi': renderOI(el); break;
+    case 'basis': renderBasis(el); break;
+    case 'midmonth': renderMidMonth(el); break;
+    case 'rollover': renderRollover(el); break;
+    case 'ban': renderBan(el); break;
+    case 'options': renderOptions(el); break;
   }
-  document.getElementById('fut-search').addEventListener('input',apply);
-  document.getElementById('fut-signal').addEventListener('change',apply);
-  document.getElementById('fut-sort').addEventListener('change',apply);
-  apply();
 }
-function showFutSheet(r) {
-  if(typeof r==='string')try{r=JSON.parse(r);}catch{return;}
-  const p=parseFloat(r.chg_pct||0),o=parseFloat(r.oi_chg_pct||0),bp=parseFloat(r.basis_pct||0),fvd=parseFloat(r.fv_diff||0);
-  openSheet(`
-    <div class="sheet-row"><span class="lbl">LTP</span><span class="val bold">₹${(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Spot</span><span class="val">₹${(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Price Chg%</span><span class="val ${p>=0?'up':'down'} bold">${p>=0?'+':''}${p.toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Price 5d Chg%</span><span class="val ${(r.price_5d_pct||0)>=0?'up':'down'}">${(r.price_5d_pct||0)>=0?'+':''}${(r.price_5d_pct||0).toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">OI</span><span class="val">${fmt_oi(r.oi)} lots</span></div>
-    <div class="sheet-row"><span class="lbl">OI Chg%</span><span class="val ${o>=0?'up':'down'}">${o>=0?'+':''}${o.toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">OI 5d Chg%</span><span class="val">${(r.oi_5d_pct||0).toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Basis%</span><span class="val ${bp>=0?'up':'down'} bold">${bp>=0?'+':''}${bp.toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Fair Value</span><span class="val">₹${(r.fair_value||0).toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">FV Diff</span><span class="val ${fvd>=0?'up':'down'}">${fvd>=0?'+':''}${fvd.toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">Conv Score</span><span class="val">${(r.conv_score||0).toFixed(1)}</span></div>
-    <div class="sheet-row"><span class="lbl">Signal</span><span class="val">${sig_badge(r.trend)}</span></div>
-    <div class="sheet-row"><span class="lbl">Pattern</span><span class="val">${r.pattern||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Lot Size</span><span class="val">${r.lot_size||r.lot||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Days to Exp</span><span class="val">${r.days_to_exp||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Expiry</span><span class="val">${r.expiry||'—'}</span></div>
-    ${r.ban_status==='ban'?'<div class="sheet-row"><span class="lbl">Status</span><span class="val down bold">F&O BAN</span></div>':''}
-  `,(r.ban_status==='ban'?'🚫 ':'')+r.symbol+' — Futures');
-}
-window.showFutSheet=showFutSheet;
-window.renderFutures=renderFutures;
 
-/* ══════════════════════════════════════════════════════════════════════
-   OI TAB  — dual screen: OI Movers + Signal Breakdown
-   ══════════════════════════════════════════════════════════════════════ */
-let _oiScreen='movers';
-function renderOI(data) {
-  const pg=document.getElementById('page-oi'); if(!data||!pg)return;
-  const ms   = data.market_summary || {};
-  const near = (data.futures||[]).filter(r=>r.expiry_rank===1);
-  const gainers = ms.top_oi_gainers || [...near].sort((a,b)=>(b.oi_chg_pct||0)-(a.oi_chg_pct||0)).slice(0,25);
-  const losers  = ms.top_oi_losers  || [...near].sort((a,b)=>(a.oi_chg_pct||0)-(b.oi_chg_pct||0)).slice(0,25);
-  const sigBD   = { LB:[], SB:[], LU:[], SC:[] };
-  near.forEach(r=>{ if(r.trend && sigBD[r.trend]) sigBD[r.trend].push(r); });
+function renderDashboard(el) {
+  const { signalCounts, basisCats, alerts, banList } = appData;
+  const total = signalCounts.LB + signalCounts.SB + signalCounts.LU + signalCounts.SC;
 
-  pg.innerHTML=`
-    <div style="display:flex;gap:8px;margin-bottom:10px">
-      <button id="oi-btn-movers" onclick="oiSwitch('movers')"
-        style="flex:1;padding:8px;border-radius:6px;border:none;font-weight:700;cursor:pointer;background:var(--accent);color:#fff;font-size:12px">
-        📊 OI Movers
-      </button>
-      <button id="oi-btn-signals" onclick="oiSwitch('signals')"
-        style="flex:1;padding:8px;border-radius:6px;border:none;font-weight:700;cursor:pointer;background:var(--panel);color:var(--fg2);font-size:12px">
-        🔍 Signals
-      </button>
-    </div>
-    <div id="oi-screen-movers">
-      <div class="sec-head">OI Gainers</div>
-      <div class="tbl-wrap"><table id="tbl-oi-gain">
-        <thead><tr><th>Symbol</th><th>OI Chg%</th><th>OI</th><th>LTP</th><th>Chg%</th><th>Sig</th></tr></thead>
-        <tbody>${gainers.map(r=>`<tr class="${row_cls(r.trend||r.signal)}" onclick='showSymbolSheet(${JSON.stringify(r)})'>
-          <td><strong>${r.symbol||r.sym||'—'}</strong></td>
-          <td class="up bold">+${(parseFloat(r.oi_chg_pct||0)).toFixed(2)}%</td>
-          <td>${fmt_oi(r.oi||0)}</td>
-          <td>₹${(parseFloat(r.ltp||0)).toFixed(2)}</td>
-          <td class="${(parseFloat(r.chg_pct||0))>=0?'up':'down'}">${(parseFloat(r.chg_pct||0))>=0?'+':''}${(parseFloat(r.chg_pct||0)).toFixed(2)}%</td>
-          <td>${sig_badge(r.trend||r.signal||'')}</td></tr>`).join('')}
-        </tbody>
-      </table></div>
-      <div class="sec-head">OI Losers</div>
-      <div class="tbl-wrap"><table id="tbl-oi-lose">
-        <thead><tr><th>Symbol</th><th>OI Chg%</th><th>OI</th><th>LTP</th><th>Chg%</th><th>Sig</th></tr></thead>
-        <tbody>${losers.map(r=>`<tr class="${row_cls(r.trend||r.signal)}" onclick='showSymbolSheet(${JSON.stringify(r)})'>
-          <td><strong>${r.symbol||r.sym||'—'}</strong></td>
-          <td class="down bold">${(parseFloat(r.oi_chg_pct||0)).toFixed(2)}%</td>
-          <td>${fmt_oi(r.oi||0)}</td>
-          <td>₹${(parseFloat(r.ltp||0)).toFixed(2)}</td>
-          <td class="${(parseFloat(r.chg_pct||0))>=0?'up':'down'}">${(parseFloat(r.chg_pct||0))>=0?'+':''}${(parseFloat(r.chg_pct||0)).toFixed(2)}%</td>
-          <td>${sig_badge(r.trend||r.signal||'')}</td></tr>`).join('')}
-        </tbody>
-      </table></div>
-    </div>
-    <div id="oi-screen-signals" style="display:none">
-      ${['LB','SB','LU','SC'].map(sig=>{
-        const cls={LB:'up bold',SB:'down bold',LU:'bold" style="color:var(--amber)',SC:'bold" style="color:var(--purple)'}[sig]||'';
-        const label={LB:'🟢 Long Buildup',SB:'🔴 Short Buildup',LU:'🟡 Long Unwinding',SC:'🟣 Short Covering'}[sig];
-        const rows2=sigBD[sig]||[];
-        return`<div class="sec-head">${label} (${rows2.length})</div>
-          <div class="tbl-wrap"><table>
-            <thead><tr><th>Symbol</th><th>LTP</th><th>Chg%</th><th>OI</th><th>OI Chg%</th><th>Basis%</th></tr></thead>
-            <tbody>${rows2.map(r=>`<tr class="${sig.toLowerCase()}" onclick='showSymbolSheet(${JSON.stringify(r)})'>
-              <td><strong>${r.symbol}</strong></td>
-              <td>₹${(r.ltp||0).toFixed(2)}</td>
-              <td class="${(r.chg_pct||0)>=0?'up':'down'}">${(r.chg_pct||0)>=0?'+':''}${(r.chg_pct||0).toFixed(2)}%</td>
-              <td>${fmt_oi(r.oi)}</td>
-              <td class="${(r.oi_chg_pct||0)>=0?'up':'down'}">${(r.oi_chg_pct||0)>=0?'+':''}${(r.oi_chg_pct||0).toFixed(2)}%</td>
-              <td class="${(r.basis_pct||0)>0?'up':'down'}">${(r.basis_pct||0)>=0?'+':''}${(r.basis_pct||0).toFixed(2)}%</td>
-            </tr>`).join('')}
-            </tbody>
-          </table></div>`;
-      }).join('')}
-    </div>`;
-
-  oiSwitch(_oiScreen);
-}
-function oiSwitch(s) {
-  _oiScreen=s;
-  const m=$('oi-screen-movers'),sg=$('oi-screen-signals');
-  const bm=$('oi-btn-movers'),bs=$('oi-btn-signals');
-  if(!m||!sg)return;
-  if(s==='movers'){
-    m.style.display='block';sg.style.display='none';
-    if(bm){bm.style.background='var(--accent)';bm.style.color='#fff';}
-    if(bs){bs.style.background='var(--panel)';bs.style.color='var(--fg2)';}
+  // Filter items for display
+  let displayItems = [];
+  if (dashboardFilter === 'all') {
+    displayItems = [...appData.signalItems.LB, ...appData.signalItems.SB, 
+                    ...appData.signalItems.LU, ...appData.signalItems.SC];
   } else {
-    m.style.display='none';sg.style.display='block';
-    if(bs){bs.style.background='var(--accent)';bs.style.color='#fff';}
-    if(bm){bm.style.background='var(--panel)';bm.style.color='var(--fg2)';}
+    displayItems = appData.signalItems[dashboardFilter] || [];
   }
-}
-window.oiSwitch=oiSwitch; window.renderOI=renderOI;
+  // Sort by conv_score desc, then OI change
+  displayItems.sort((a, b) => (b.conv_score - a.conv_score) || (b.oi_chg - a.oi_chg));
 
-/* ══════════════════════════════════════════════════════════════════════
-   ROLLOVER TAB
-   ══════════════════════════════════════════════════════════════════════ */
-function renderRollover(data) {
-  const pg=document.getElementById('page-rollover'); if(!data||!pg)return;
-  const rv=data.rollover||{};
-  const rows=rv.symbols||[];
-  const mktPct=rv.market_rollover_pct||0;
+  const basisTotal = basisCats.dd.length + basisCats.d.length + basisCats.p.length + basisCats.pm.length + basisCats.dp.length;
 
-  if(!rows.length){
-    pg.innerHTML='<div class="error-state"><div class="err-icon">📭</div><div>No rollover data in snapshot</div></div>';
-    return;
-  }
-  pg.innerHTML=`
-    <div class="card" style="text-align:center;margin-bottom:12px">
-      <div class="card-title">Market Rollover %</div>
-      <div style="font-size:48px;font-weight:700;color:var(--accent);line-height:1">${Number(mktPct).toFixed(1)}%</div>
-      <div style="font-size:11px;color:var(--fg2);margin-top:6px">${rows.length} symbols · Near: ${rows[0]?.expiry_near||'—'}</div>
-      <div style="margin:12px auto;width:160px;height:80px;position:relative;overflow:hidden">
-        <div style="position:absolute;bottom:0;left:0;width:160px;height:160px;border-radius:50%;border:12px solid var(--border);clip-path:inset(0 0 50% 0)"></div>
-        <div style="position:absolute;bottom:0;left:0;width:160px;height:160px;border-radius:50%;border:12px solid var(--accent);clip-path:inset(0 0 50% 0);transform:rotate(${Math.min(mktPct,100)*1.8-180}deg);transform-origin:50% 100%;transition:transform 0.5s ease"></div>
+  let html = `
+    <!-- Refresh Bar -->
+    <div class="refresh-bar">
+      <button class="refresh-btn" onclick="loadData()">🔄 Refresh Data</button>
+      <span class="source-info">Source: ${CONFIG.primarySource === 'github' ? 'GitHub' : 'jsonbin.io'}</span>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="cards-grid">
+      <div class="card lb" onclick="setFilter('LB')">
+        <div class="card-icon">🔥</div>
+        <div class="card-count">${signalCounts.LB}</div>
+        <div class="card-label">Long Buildup</div>
+      </div>
+      <div class="card sb" onclick="setFilter('SB')">
+        <div class="card-icon">🐻</div>
+        <div class="card-count">${signalCounts.SB}</div>
+        <div class="card-label">Short Buildup</div>
+      </div>
+      <div class="card lu" onclick="setFilter('LU')">
+        <div class="card-icon">💧</div>
+        <div class="card-count">${signalCounts.LU}</div>
+        <div class="card-label">Long Unwinding</div>
+      </div>
+      <div class="card sc" onclick="setFilter('SC')">
+        <div class="card-icon">⚡</div>
+        <div class="card-count">${signalCounts.SC}</div>
+        <div class="card-label">Short Covering</div>
       </div>
     </div>
-    <div class="filter-bar">
-      <input id="ro-search" type="search" placeholder="Search symbol…">
-      <select id="ro-sort">
-        <option value="roll_desc">Roll% ↓</option>
-        <option value="roll_asc">Roll% ↑</option>
-        <option value="oi_desc">Near OI ↓</option>
-        <option value="coc_desc">CoC% ↓</option>
-      </select>
-    </div>
-    <div class="tbl-wrap"><table id="tbl-rollover">
-      <thead><tr><th>Symbol</th><th>Roll%</th><th>Near OI</th><th>Next OI</th><th>CoC%</th><th>Bias</th></tr></thead>
-      <tbody id="ro-tbody"></tbody>
-    </table></div>`;
 
-  function apply() {
-    const q=document.getElementById('ro-search').value.trim().toUpperCase();
-    const so=document.getElementById('ro-sort').value;
-    let list=rows.filter(r=>!q||(r.symbol||'').includes(q));
-    list.sort((a,b)=>{
-      if(so==='roll_asc')return(a.rollover_pct||0)-(b.rollover_pct||0);
-      if(so==='oi_desc') return(b.oi_near||0)-(a.oi_near||0);
-      if(so==='coc_desc')return(b.cost_of_carry||0)-(a.cost_of_carry||0);
-      return(b.rollover_pct||0)-(a.rollover_pct||0);
+    <!-- Filters -->
+    <div class="filters">
+      <button class="filter-btn ${dashboardFilter==='all'?'active':''}" onclick="setFilter('all')">All (${total})</button>
+      <button class="filter-btn ${dashboardFilter==='LB'?'active':''}" onclick="setFilter('LB')">LB (${signalCounts.LB})</button>
+      <button class="filter-btn ${dashboardFilter==='SB'?'active':''}" onclick="setFilter('SB')">SB (${signalCounts.SB})</button>
+      <button class="filter-btn ${dashboardFilter==='LU'?'active':''}" onclick="setFilter('LU')">LU (${signalCounts.LU})</button>
+      <button class="filter-btn ${dashboardFilter==='SC'?'active':''}" onclick="setFilter('SC')">SC (${signalCounts.SC})</button>
+    </div>
+
+    <!-- Filtered Results Table -->
+    <div class="table-scroll">
+      <div class="table-wrap">
+        <div class="table-header" style="grid-template-columns: 90px 70px 80px 90px 90px 110px 1fr; min-width: 660px;">
+          <span>Symbol</span><span>Signal</span><span>Basis%</span><span>LTP</span><span>OI</span><span>OI Chg</span><span>Alerts / Pattern</span>
+        </div>
+  `;
+
+  if (displayItems.length === 0) {
+    html += `<div class="empty">No items match the selected filter</div>`;
+  } else {
+    displayItems.forEach(item => {
+      const basisClass = (item.basis_pct || 0) >= 0 ? 'basis-pos' : 'basis-neg';
+      const oiClass = (item.oi_chg || 0) >= 0 ? 'oi-up' : 'oi-down';
+      const oiArrow = (item.oi_chg || 0) >= 0 ? '▲' : '▼';
+      html += `
+        <div class="table-row" style="grid-template-columns: 90px 70px 55px 80px 90px 90px 110px 1fr; min-width: 720px; cursor:pointer;" onclick="showDetail('${item.symbol}')">
+          <span class="col-symbol">${item.symbol}</span>
+          <span class="col-signal signal-${item.signal}">${item.signal}</span>
+          <span style="font-weight:700;color:#f0c040;text-align:center;">${item.conv_score !== null ? item.conv_score : '-'}</span>
+          <span class="col-basis ${basisClass}">${item.basis_pct !== null ? item.basis_pct.toFixed(2) : '-'}</span>
+          <span class="col-price">${item.ltp !== null ? item.ltp.toFixed(1) : '-'}</span>
+          <span class="col-oi">${formatNumber(item.oi)}</span>
+          <span class="col-oi ${oiClass}">${oiArrow} ${formatNumber(Math.abs(item.oi_chg))}</span>
+          <span class="col-alerts">${renderAlerts(item.alerts, item.pattern)}</span>
+        </div>
+      `;
     });
-    document.getElementById('ro-tbody').innerHTML=list.map(r=>{
-      const rp=parseFloat(r.rollover_pct||0),coc=parseFloat(r.cost_of_carry||0);
-      const fc=rp>=70?'#22c55e':rp>=40?'#1a7abf':'#f59e0b';
-      return`<tr onclick='showRollSheet(${JSON.stringify(r)})'>
-        <td><strong>${r.symbol}</strong></td>
-        <td><div style="font-weight:700">${rp.toFixed(1)}%</div>
-          <div class="roll-bar"><div class="roll-fill" style="width:${Math.min(rp,100).toFixed(1)}%;background:${fc}"></div></div></td>
-        <td>${fmt_oi(r.oi_near)}</td>
-        <td>${fmt_oi(r.oi_next)}</td>
-        <td class="${coc>=0?'up':'down'}">${coc>=0?'+':''}${coc.toFixed(2)}%</td>
-        <td class="${(r.bias||'')=='Bullish'?'up':(r.bias||'')=='Bearish'?'down':'neu'}">${r.bias||'—'}</td></tr>`;
-    }).join('');
-    makeSortable('tbl-rollover');
   }
-  document.getElementById('ro-search').addEventListener('input',apply);
-  document.getElementById('ro-sort').addEventListener('change',apply);
-  apply();
-}
-function showRollSheet(r) {
-  if(typeof r==='string')try{r=JSON.parse(r);}catch{return;}
-  const rp=parseFloat(r.rollover_pct||0),coc=parseFloat(r.cost_of_carry||0);
-  openSheet(`
-    <div class="sheet-row"><span class="lbl">Rollover %</span><span class="val bold" style="font-size:22px">${rp.toFixed(1)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Near OI</span><span class="val">${fmt_oi(r.oi_near)} lots</span></div>
-    <div class="sheet-row"><span class="lbl">Next OI</span><span class="val">${fmt_oi(r.oi_next)} lots</span></div>
-    <div class="sheet-row"><span class="lbl">Near Expiry</span><span class="val">${r.expiry_near||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Next Expiry</span><span class="val">${r.expiry_next||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Cost of Carry</span><span class="val ${coc>=0?'up':'down'}">${coc>=0?'+':''}${coc.toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Near Basis%</span><span class="val">${(r.near_basis_pct||0).toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Mid Basis%</span><span class="val">${(r.mid_basis_pct||0).toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Days to Near</span><span class="val">${r.days_to_near||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Bias</span><span class="val ${(r.bias||'')=='Bullish'?'up':(r.bias||'')=='Bearish'?'down':'neu'}">${r.bias||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Lot Size</span><span class="val">${r.lot_size||r.lot||'—'}</span></div>
-  `,r.symbol+' — Rollover');
-}
-window.showRollSheet=showRollSheet; window.renderRollover=renderRollover;
+  html += `</div></div>`;
 
-/* ══════════════════════════════════════════════════════════════════════
-   BASIS TAB
-   ══════════════════════════════════════════════════════════════════════ */
-function renderBasis(data) {
-  const pg=document.getElementById('page-basis'); if(!data||!pg)return;
-  const rows=(data.futures||[]).filter(r=>r.expiry_rank===1&&(r.spot||0)>0);
-  if(!rows.length){ pg.innerHTML='<div class="error-state"><div class="err-icon">⚖️</div><div>No basis data</div></div>'; return; }
-  const premium =rows.filter(r=>(r.basis_pct||0)> 0.5).length;
-  const discount=rows.filter(r=>(r.basis_pct||0)<-0.5).length;
-  const parity  =rows.length-premium-discount;
-
-  pg.innerHTML=`
-    <div style="display:flex;gap:8px;margin-bottom:10px">
-      <div class="card" style="flex:1;text-align:center;padding:8px;border-color:#064e1a">
-        <div style="font-size:22px;font-weight:700;color:var(--green)">${premium}</div>
-        <div style="font-size:10px;color:var(--fg2)">Premium</div>
-      </div>
-      <div class="card" style="flex:1;text-align:center;padding:8px">
-        <div style="font-size:22px;font-weight:700;color:var(--fg2)">${parity}</div>
-        <div style="font-size:10px;color:var(--fg2)">Parity</div>
-      </div>
-      <div class="card" style="flex:1;text-align:center;padding:8px;border-color:#4e0606">
-        <div style="font-size:22px;font-weight:700;color:var(--red)">${discount}</div>
-        <div style="font-size:10px;color:var(--fg2)">Discount</div>
-      </div>
+  // Basis Summary Bar
+  html += `
+    <div class="section-title">Basis Summary</div>
+    <div class="basis-bar">
+      <div class="basis-seg dd" style="width:${basisTotal?(basisCats.dd.length/basisTotal*100):0}%">${basisCats.dd.length>0?basisCats.dd.length+' DD':''}</div>
+      <div class="basis-seg d" style="width:${basisTotal?(basisCats.d.length/basisTotal*100):0}%">${basisCats.d.length>0?basisCats.d.length+' D':''}</div>
+      <div class="basis-seg p" style="width:${basisTotal?(basisCats.p.length/basisTotal*100):0}%">${basisCats.p.length>0?basisCats.p.length+' P':''}</div>
+      <div class="basis-seg pm" style="width:${basisTotal?(basisCats.pm.length/basisTotal*100):0}%">${basisCats.pm.length>0?basisCats.pm.length+' Pm':''}</div>
+      <div class="basis-seg dp" style="width:${basisTotal?(basisCats.dp.length/basisTotal*100):0}%">${basisCats.dp.length>0?basisCats.dp.length+' DP':''}</div>
     </div>
-    <div class="filter-bar">
-      <input id="ba-search" type="search" placeholder="Search symbol…">
-      <select id="ba-filter">
-        <option value="">All</option>
-        <option value="premium">Premium only</option>
-        <option value="discount">Discount only</option>
-      </select>
-      <select id="ba-sort">
-        <option value="basis_desc">Basis% ↓</option>
-        <option value="basis_asc">Basis% ↑</option>
-        <option value="conv_desc">Conv ↓</option>
-        <option value="oi_desc">OI ↓</option>
-      </select>
+    <div style="display:flex;gap:16px;font-size:11px;color:#888;margin-bottom:20px;flex-wrap:wrap;">
+      <span><span style="color:#c62828;">■</span> Deep Discount (&lt;-1%)</span>
+      <span><span style="color:#ef6c00;">■</span> Discount (-1% to 0)</span>
+      <span><span style="color:#546e7a;">■</span> Par (0)</span>
+      <span><span style="color:#0277bd;">■</span> Premium (0 to +1%)</span>
+      <span><span style="color:#2e7d32;">■</span> Deep Premium (&gt;+1%)</span>
     </div>
-    <div class="tbl-wrap"><table id="tbl-basis">
-      <thead><tr><th>Symbol</th><th>Spot</th><th>LTP</th><th>Basis%</th><th>FV</th><th>Conv</th><th>Sig</th></tr></thead>
-      <tbody id="ba-tbody"></tbody>
-    </table></div>`;
+  `;
 
-  function apply() {
-    const q=document.getElementById('ba-search').value.trim().toUpperCase();
-    const f=document.getElementById('ba-filter').value;
-    const so=document.getElementById('ba-sort').value;
-    let list=rows.filter(r=>{
-      if(q&&!(r.symbol||'').includes(q))return false;
-      const bp=r.basis_pct||0;
-      if(f==='premium' &&bp<=0.5) return false;
-      if(f==='discount'&&bp>=-0.5)return false;
-      return true;
+  // Ban List
+  html += `<div class="section-title">Ban List</div>`;
+  if (banList.length === 0) {
+    html += `<div class="empty" style="padding:20px;">No securities banned</div>`;
+  } else {
+    html += `<div style="margin-bottom:20px;">`;
+    banList.forEach(item => {
+      html += `
+        <div class="ban-item" onclick="showDetail('${item.symbol}')" style="cursor:pointer;">
+          <span class="ban-badge">🚫 BANNED</span>
+          <span class="ban-symbol">${item.symbol}</span>
+          <span style="color:#888;font-size:12px;">OI: ${formatNumber(item.oi)} | LTP: ${item.ltp}</span>
+        </div>
+      `;
     });
-    list.sort((a,b)=>{
-      if(so==='basis_asc')return(a.basis_pct||0)-(b.basis_pct||0);
-      if(so==='conv_desc') return(b.conv_score||0)-(a.conv_score||0);
-      if(so==='oi_desc')   return(b.oi||0)-(a.oi||0);
-      return(b.basis_pct||0)-(a.basis_pct||0);
-    });
-    document.getElementById('ba-tbody').innerHTML=list.map(r=>{
-      const bp=parseFloat(r.basis_pct||0);
-      const bpCls=bp>1?'up bold':bp<-1?'down bold':bp>0.3?'up':bp<-0.3?'down':'neu';
-      return`<tr class="${row_cls(r.trend)}" onclick='showBasisSheet(${JSON.stringify(r)})'>
-        <td>${ban_badge(r)}<strong>${r.symbol}</strong></td>
-        <td>₹${(r.spot||0).toFixed(2)}</td>
-        <td>₹${(r.ltp||0).toFixed(2)}</td>
-        <td class="${bpCls}">${bp>=0?'+':''}${bp.toFixed(2)}%</td>
-        <td>₹${(r.fair_value||0).toFixed(2)}</td>
-        <td>${(r.conv_score||0).toFixed(1)}</td>
-        <td>${sig_badge(r.trend)}</td></tr>`;
-    }).join('');
-    makeSortable('tbl-basis');
+    html += `</div>`;
   }
-  document.getElementById('ba-search').addEventListener('input',apply);
-  document.getElementById('ba-filter').addEventListener('change',apply);
-  document.getElementById('ba-sort').addEventListener('change',apply);
-  apply();
+
+  // Top Alerts
+  html += `<div class="section-title">Top Alerts</div>`;
+  if (alerts.length === 0) {
+    html += `<div class="empty" style="padding:20px;">No alerts</div>`;
+  } else {
+    html += `<div style="margin-bottom:20px;">`;
+    alerts.slice(0, 15).forEach(a => {
+      const alertClass = getAlertClass(a.alert);
+      html += `
+        <div class="alert-item" onclick="showDetail('${a.symbol}')" style="cursor:pointer;">
+          <span class="alert-symbol">${a.symbol}</span>
+          <span class="alert-tag ${alertClass}">${a.alert}</span>
+          <span style="color:#666;font-size:11px;">${a.signal}</span>
+        </div>
+      `;
+    });
+    html += `</div>`;
+  }
+
+  el.innerHTML = html;
+  initTableSorting();
 }
-function showBasisSheet(r) {
-  if(typeof r==='string')try{r=JSON.parse(r);}catch{return;}
-  const bp=parseFloat(r.basis_pct||0),fvd=parseFloat(r.fv_diff||0);
-  openSheet(`
-    <div class="sheet-row"><span class="lbl">Spot</span><span class="val bold">₹${(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Futures LTP</span><span class="val bold">₹${(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Basis</span><span class="val">₹${(r.basis||0).toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">Basis %</span><span class="val ${bp>=0?'up':'down'} bold">${bp>=0?'+':''}${bp.toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Fair Value</span><span class="val">₹${(r.fair_value||0).toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">FV Diff</span><span class="val ${fvd>=0?'up':'down'}">${fvd>=0?'+':''}${fvd.toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">Conv Score</span><span class="val">${(r.conv_score||0).toFixed(1)}</span></div>
-    <div class="sheet-row"><span class="lbl">Signal</span><span class="val">${sig_badge(r.trend)}</span></div>
-    <div class="sheet-row"><span class="lbl">Pattern</span><span class="val">${r.pattern||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Days to Exp</span><span class="val">${r.days_to_exp||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Expiry</span><span class="val">${r.expiry||'—'}</span></div>
-  `,r.symbol+' — Basis');
+
+// ── Tracker state ────────────────────────────────────────────────────────────
+let trackerExpiry  = 'near';   // near | mid | nearmid | all
+
+function setTrackerExpiry(v) {
+  trackerExpiry = v;
+  document.querySelectorAll('#trackerExpiryFilter .filter-pill').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-val') === v);
+  });
+  renderTracker(document.getElementById('content'));
 }
-window.showBasisSheet=showBasisSheet; window.renderBasis=renderBasis;
 
-/* ══════════════════════════════════════════════════════════════════════
-   STRATEGY SCANNER TAB — reads strategy_scanner.strategies{}
-   Built from signal_breakdown + scoring in schema bridge (v2)
-   or from strategy_scanner[] in v3 snapshot
-   ══════════════════════════════════════════════════════════════════════ */
-let _scanFilter='', _scanStrat='all', _scanSort='score_desc';
+function getTrackerRows() {
+  switch(trackerExpiry) {
+    case 'near':    return appData.nearMonth;
+    case 'mid':     return appData.midMonth;
+    case 'nearmid': return [...appData.nearMonth, ...appData.midMonth];
+    case 'all':     return appData.allExpiry;
+    default:        return appData.nearMonth;
+  }
+}
 
-function renderScanner(data) {
-  const pg=document.getElementById('page-scanner'); if(!data||!pg)return;
-  const ss   = data.strategy_scanner || {};
-  const strats = ss.strategies || {};
+function renderTracker(el) {
+  const rows = getTrackerRows();
+  const expiryLabel = { near: appData.expiries.near || 'Near', mid: appData.expiries.mid || 'Mid',
+                        nearmid: 'Near + Mid', all: 'All' }[trackerExpiry] || '';
+  let html = `
+    <div class="refresh-bar">
+      <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
+      <span class="source-info">${rows.length} contracts · ${expiryLabel}</span>
+    </div>
+    <input type="text" class="search-box" id="searchBox" placeholder="🔍 Search symbol..." oninput="filterTracker()">
 
-  // Flatten all hits across all strategies into a unified list
-  const BIAS_CLS = { bullish:'strat-bullish', bearish:'strat-bearish', neutral:'strat-neutral' };
-  const BIAS_LBL = { bullish:'▲ Bullish', bearish:'▼ Bearish', neutral:'● Neutral' };
+    <!-- Expiry Filter -->
+    <div class="filter-pills" id="trackerExpiryFilter">
+      <span style="font-size:12px;color:#888;margin-right:4px;">Expiry:</span>
+      <button class="filter-pill ${trackerExpiry==='near'?'active':''}" data-val="near" onclick="setTrackerExpiry('near')">Near (${appData.nearMonth.length})</button>
+      <button class="filter-pill ${trackerExpiry==='mid'?'active':''}" data-val="mid" onclick="setTrackerExpiry('mid')">Mid (${appData.midMonth.length})</button>
+      <button class="filter-pill ${trackerExpiry==='nearmid'?'active':''}" data-val="nearmid" onclick="setTrackerExpiry('nearmid')">Near+Mid (${appData.nearMonth.length + appData.midMonth.length})</button>
+      <button class="filter-pill ${trackerExpiry==='all'?'active':''}" data-val="all" onclick="setTrackerExpiry('all')">All (${appData.allExpiry.length})</button>
+    </div>
 
-  // Build strategy options for filter
-  const stratCodes = Object.keys(strats).filter(k => (strats[k].hits||[]).length > 0);
-  const totalHits  = stratCodes.reduce((n,k)=>n+(strats[k].hits||[]).length,0);
+    <!-- Signal Filter -->
+    <div class="filter-pills" id="signalFilter">
+      <span style="font-size:12px;color:#888;margin-right:4px;">Signal:</span>
+      <button class="filter-pill active" onclick="setTrackerSignal('all')">All</button>
+      <button class="filter-pill" onclick="setTrackerSignal('LB')">🔥 LB</button>
+      <button class="filter-pill" onclick="setTrackerSignal('SB')">🐻 SB</button>
+      <button class="filter-pill" onclick="setTrackerSignal('LU')">💧 LU</button>
+      <button class="filter-pill" onclick="setTrackerSignal('SC')">⚡ SC</button>
+    </div>
 
-  // Summary bar
-  let bull=0,bear=0,neu=0;
-  stratCodes.forEach(k => {
-    const b=(strats[k].bias||'').toLowerCase();
-    (strats[k].hits||[]).forEach(()=>{ if(b==='bullish')bull++; else if(b==='bearish')bear++; else neu++; });
+    <!-- Pattern Filter -->
+    <div class="filter-pills" id="patternFilter">
+      <span style="font-size:12px;color:#888;margin-right:4px;">Pattern:</span>
+      <button class="filter-pill active" onclick="setTrackerPattern('all')">All</button>
+      <button class="filter-pill" onclick="setTrackerPattern('Strong LB')">🔥 Strong LB</button>
+      <button class="filter-pill" onclick="setTrackerPattern('Strong SB')">🐻 Strong SB</button>
+      <button class="filter-pill" onclick="setTrackerPattern('Bull Trap')">⚠ Bull Trap</button>
+      <button class="filter-pill" onclick="setTrackerPattern('Squeeze')">🚀 Squeeze</button>
+      <button class="filter-pill" onclick="setTrackerPattern('Recovery')">🔄 Recovery</button>
+    </div>
+
+    <!-- Alert Filter -->
+    <div class="filter-pills" id="alertFilter">
+      <span style="font-size:12px;color:#888;margin-right:4px;">Alert:</span>
+      <button class="filter-pill active" onclick="setTrackerAlert('all')">All</button>
+      <button class="filter-pill" onclick="setTrackerAlert('Hi Disc')">🔻Hi Disc</button>
+      <button class="filter-pill" onclick="setTrackerAlert('Squeeze')">🚀Squeeze</button>
+      <button class="filter-pill" onclick="setTrackerAlert('Bull Trap')">⚠Bull Trap</button>
+      <button class="filter-pill" onclick="setTrackerAlert('OI Spike')">⚡OI Spike</button>
+      <button class="filter-pill" onclick="setTrackerAlert('Rev')">🔄Reversal</button>
+    </div>
+
+    <!-- Basis Filter -->
+    <div class="filter-pills" id="basisFilter">
+      <span style="font-size:12px;color:#888;margin-right:4px;">Basis:</span>
+      <button class="filter-pill active" onclick="setTrackerBasis('all')">All</button>
+      <button class="filter-pill" onclick="setTrackerBasis('dd')">🔴 Deep Disc</button>
+      <button class="filter-pill" onclick="setTrackerBasis('d')">🟠 Discount</button>
+      <button class="filter-pill" onclick="setTrackerBasis('p')">⚪ Parity</button>
+      <button class="filter-pill" onclick="setTrackerBasis('pm')">🔵 Premium</button>
+      <button class="filter-pill" onclick="setTrackerBasis('dp')">🟢 Deep Prem</button>
+    </div>
+
+    <div class="table-scroll">
+      <div class="table-wrap">
+        <div class="table-header" style="grid-template-columns: 100px 55px 55px 70px 80px 90px 90px 110px 90px 1fr; min-width: 920px;">
+          <span>Symbol</span><span>Expiry</span><span>Signal</span><span>Conv★</span><span>Basis%</span><span>Spot</span><span>LTP</span><span>OI / Chg</span><span>5d OI%</span><span>Pattern / Alerts</span>
+        </div>
+        <div id="trackerRows">
+  `;
+
+  rows.forEach(item => {
+    const basisClass = (item.basis_pct || 0) >= 0 ? 'basis-pos' : 'basis-neg';
+    const oiClass = (item.oi_chg || 0) >= 0 ? 'oi-up' : 'oi-down';
+    const oiSparkSvg = renderSparkline(item.oi_history || [], item.oi_chg >= 0 ? '#4caf50' : '#ef5350');
+    const expiryShort = item.expiry ? item.expiry.replace('-2026','') : '—';
+    const isNear = item.expiry_rank === 1;
+    const expiryColor = isNear ? '#4fc3f7' : item.expiry_rank === 2 ? '#ffa726' : '#aaa';
+    html += `
+          <div class="table-row tracker-row"
+            data-symbol="${item.symbol.toLowerCase()}"
+            data-signal="${item.signal}"
+            data-alerts="${(item.alerts || '').toLowerCase()}"
+            data-pattern="${(item.pattern || '').toLowerCase()}"
+            data-basis="${item.basis_pct !== null ? item.basis_pct : 0}"
+            data-basiscat="${item.basis_pct !== null ? (item.basis_pct < -1 ? 'dd' : item.basis_pct < 0 ? 'd' : item.basis_pct === 0 ? 'p' : item.basis_pct <= 1 ? 'pm' : 'dp') : 'p'}"
+            style="grid-template-columns: 100px 55px 55px 70px 80px 90px 90px 110px 90px 1fr; min-width: 920px; cursor:pointer;"
+            onclick="showDetail('${item.symbol}')">
+            <span class="col-symbol">${item.ban_status==='banned'?'🔴 ':''}${item.symbol}</span>
+            <span style="font-size:10px;color:${expiryColor};font-weight:600;">${expiryShort}</span>
+            <span class="col-signal signal-${item.signal}">${item.signal || '—'}</span>
+            <span style="font-weight:700;color:#f0c040;text-align:center;">${item.conv_score || '-'}</span>
+            <span class="col-basis ${basisClass}">${item.basis_pct !== null ? item.basis_pct.toFixed(2) : '-'}</span>
+            <span>${item.spot ? item.spot.toFixed(1) : '-'}</span>
+            <span>${item.ltp ? item.ltp.toFixed(1) : '-'}</span>
+            <span class="col-oi ${oiClass}">${formatNumber(item.oi)}<br><span class="oi-chg">${(item.oi_chg||0)>=0?'▲':'▼'} ${formatNumber(Math.abs(item.oi_chg||0))}</span></span>
+            <span>${item.oi_5d_pct ? item.oi_5d_pct.toFixed(1)+'%' : '-'}</span>
+            <span class="col-alerts">${item.pattern || '—'}${item.alerts ? '<br><span style="font-size:10px;color:#aaa;">'+item.alerts+'</span>' : ''}</span>
+          </div>
+        `;
   });
 
-  pg.innerHTML=`
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
-      <div class="card" style="text-align:center;padding:8px;border-color:#064e1a">
-        <div style="font-size:22px;font-weight:700;color:var(--green)">${bull}</div>
-        <div style="font-size:10px;color:var(--fg2)">Bullish</div>
-      </div>
-      <div class="card" style="text-align:center;padding:8px">
-        <div style="font-size:22px;font-weight:700;color:var(--fg2)">${neu}</div>
-        <div style="font-size:10px;color:var(--fg2)">Neutral</div>
-      </div>
-      <div class="card" style="text-align:center;padding:8px;border-color:#4e0606">
-        <div style="font-size:22px;font-weight:700;color:var(--red)">${bear}</div>
-        <div style="font-size:10px;color:var(--fg2)">Bearish</div>
-      </div>
-    </div>
-    <div class="filter-bar">
-      <input id="sc-search" type="search" placeholder="Symbol…" value="${_scanFilter}">
-      <select id="sc-strat">
-        <option value="all">All Strategies (${totalHits})</option>
-        ${stratCodes.map(k=>`<option value="${k}"${_scanStrat===k?' selected':''}>${strats[k].emoji||''} ${strats[k].name} (${(strats[k].hits||[]).length})</option>`).join('')}
-      </select>
-      <select id="sc-sort">
-        <option value="score_desc"${_scanSort==='score_desc'?' selected':''}>Score ↓</option>
-        <option value="sym_asc"${_scanSort==='sym_asc'?' selected':''}>Symbol A–Z</option>
-      </select>
-    </div>
-    <div id="sc-count" style="font-size:11px;color:var(--fg2);margin-bottom:6px"></div>
-    <div id="sc-cards"></div>`;
+  html += `</div></div></div>`;
+  el.innerHTML = html;
+  initTableSorting();
+}
 
-  if(!stratCodes.length) {
-    pg.querySelector('#sc-cards').innerHTML=`<div class="error-state" style="height:160px">
-      <div class="err-icon">🎯</div>
-      <div>No strategy hits in snapshot</div>
-      <div style="font-size:11px;color:var(--fg2);margin-top:6px">Run a data load in the desktop app</div></div>`;
-    return;
+function renderOI(el) {
+  const { gainers, losers } = appData.oiMovers;
+
+  let html = `
+    <div class="refresh-bar">
+      <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
+    </div>
+
+    <!-- Signal Filter -->
+    <div class="filter-pills" id="oiSignalFilter">
+      <span style="font-size:12px;color:#888;margin-right:4px;">Signal:</span>
+      <button class="filter-pill active" onclick="setOISignal('all')">All</button>
+      <button class="filter-pill" onclick="setOISignal('LB')">LB</button>
+      <button class="filter-pill" onclick="setOISignal('SB')">SB</button>
+      <button class="filter-pill" onclick="setOISignal('LU')">LU</button>
+      <button class="filter-pill" onclick="setOISignal('SC')">SC</button>
+    </div>
+
+    <!-- Gainers/Losers Toggle -->
+    <div class="filter-pills" id="oiToggleFilter">
+      <span style="font-size:12px;color:#888;margin-right:4px;">Show:</span>
+      <button class="filter-pill active" onclick="setOISection('all')">All</button>
+      <button class="filter-pill" onclick="setOISection('gainers')">🔥 Gainers</button>
+      <button class="filter-pill" onclick="setOISection('losers')">❄️ Losers</button>
+    </div>
+
+    <!-- Alert Filter -->
+    <div class="filter-pills" id="oiAlertFilter">
+      <span style="font-size:12px;color:#888;margin-right:4px;">Alert:</span>
+      <button class="filter-pill active" onclick="setOIAlert('all')">All</button>
+      <button class="filter-pill" onclick="setOIAlert('Hi Disc')">🔻Hi Disc</button>
+      <button class="filter-pill" onclick="setOIAlert('Squeeze')">🚀Squeeze</button>
+      <button class="filter-pill" onclick="setOIAlert('Bull Trap')">⚠Bull Trap</button>
+      <button class="filter-pill" onclick="setOIAlert('OI Spike')">⚡OI Spike</button>
+      <button class="filter-pill" onclick="setOIAlert('Rev')">🔄Reversal</button>
+    </div>
+
+    <div class="section-title oi-section" data-section="gainers">🔥 OI Gainers (Top 25)</div>
+    <div class="table-scroll">
+      <div class="table-wrap" style="margin-bottom:24px;">
+        <div class="table-header" style="grid-template-columns: 100px 70px 55px 90px 110px 90px 70px 1fr; min-width: 800px;">
+          <span>Symbol</span><span>Signal</span><span>Conv★</span><span>OI Chg</span><span>5d OI%</span><span>Price Chg</span><span>Signal</span><span>Alerts</span>
+        </div>
+  `;
+
+  gainers.forEach(item => {
+    html += `
+        <div class="table-row oi-row" data-signal="${item.signal}" data-alerts="${(item.alerts || '').toLowerCase()}" style="grid-template-columns: 100px 70px 55px 90px 110px 90px 70px 1fr; min-width: 800px; cursor:pointer;" onclick="showDetail('${item.symbol}')">
+          <span class="col-symbol">${item.symbol}</span>
+          <span class="col-signal signal-${item.signal}">${item.signal}</span>
+          <span style="font-weight:700;color:#f0c040;text-align:center;">${item.conv_score !== null ? item.conv_score : '-'}</span>
+          <span class="oi-up">▲ ${formatNumber(item.oi_chg)}</span>
+          <span>${item.oi_5d_pct !== null ? item.oi_5d_pct.toFixed(1)+'%' : '-'}</span>
+          <span class="${item.price_chg>=0?'oi-up':'oi-down'}">${item.price_chg>=0?'▲':'▼'} ${Math.abs(item.price_chg).toFixed(1)}</span>
+          <span class="col-signal signal-${item.signal}">${item.signal}</span>
+          <span class="col-alerts">${renderAlerts(item.alerts, item.pattern)}</span>
+        </div>
+    `;
+  });
+  html += `</div></div>`;
+
+  html += `
+    <div class="section-title oi-section" data-section="losers">❄️ OI Losers (Top 25)</div>
+    <div class="table-scroll">
+      <div class="table-wrap">
+        <div class="table-header" style="grid-template-columns: 100px 70px 55px 90px 110px 90px 70px 1fr; min-width: 800px;">
+          <span>Symbol</span><span>Signal</span><span>Conv★</span><span>OI Chg</span><span>5d OI%</span><span>Price Chg</span><span>Signal</span><span>Alerts</span>
+        </div>
+  `;
+
+  losers.forEach(item => {
+    html += `
+        <div class="table-row oi-row" data-signal="${item.signal}" data-alerts="${(item.alerts || '').toLowerCase()}" style="grid-template-columns: 100px 70px 55px 90px 110px 90px 70px 1fr; min-width: 800px; cursor:pointer;" onclick="showDetail('${item.symbol}')">
+          <span class="col-symbol">${item.symbol}</span>
+          <span class="col-signal signal-${item.signal}">${item.signal}</span>
+          <span style="font-weight:700;color:#f0c040;text-align:center;">${item.conv_score !== null ? item.conv_score : '-'}</span>
+          <span class="oi-down">▼ ${formatNumber(Math.abs(item.oi_chg))}</span>
+          <span>${item.oi_5d_pct !== null ? item.oi_5d_pct.toFixed(1)+'%' : '-'}</span>
+          <span class="${item.price_chg>=0?'oi-up':'oi-down'}">${item.price_chg>=0?'▲':'▼'} ${Math.abs(item.price_chg).toFixed(1)}</span>
+          <span class="col-signal signal-${item.signal}">${item.signal}</span>
+          <span class="col-alerts">${renderAlerts(item.alerts, item.pattern)}</span>
+        </div>
+    `;
+  });
+  html += `</div></div>`;
+
+  el.innerHTML = html;
+  initTableSorting();
+}
+
+function renderBasis(el) {
+  let html = `
+    <div class="refresh-bar">
+      <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
+      <span class="source-info">${appData.basisSummary.length} items</span>
+    </div>
+
+    <!-- Signal Filter -->
+    <div class="filter-pills" id="basisSignalFilter">
+      <span style="font-size:12px;color:#888;margin-right:4px;">Signal:</span>
+      <button class="filter-pill active" onclick="setBasisSignal('all')">All</button>
+      <button class="filter-pill" onclick="setBasisSignal('LB')">LB</button>
+      <button class="filter-pill" onclick="setBasisSignal('SB')">SB</button>
+      <button class="filter-pill" onclick="setBasisSignal('LU')">LU</button>
+      <button class="filter-pill" onclick="setBasisSignal('SC')">SC</button>
+    </div>
+
+    <!-- Basis Category Filter -->
+    <div class="filter-pills" id="basisCatFilter">
+      <span style="font-size:12px;color:#888;margin-right:4px;">Basis:</span>
+      <button class="filter-pill active" onclick="setBasisCat('all')">All</button>
+      <button class="filter-pill" onclick="setBasisCat('dd')">🔴 Deep Disc (&lt;-1%)</button>
+      <button class="filter-pill" onclick="setBasisCat('d')">🟠 Discount (-1% to 0)</button>
+      <button class="filter-pill" onclick="setBasisCat('p')">⚪ Parity (0)</button>
+      <button class="filter-pill" onclick="setBasisCat('pm')">🔵 Premium (0 to +1%)</button>
+      <button class="filter-pill" onclick="setBasisCat('dp')">🟢 Deep Prem (&gt;+1%)</button>
+    </div>
+
+    <!-- Conv★ Filter -->
+    <div class="range-filter">
+      <label>Conv★ ≥</label>
+      <input type="range" id="convRange" min="0" max="5" step="1" value="0" oninput="filterBasisConv(this.value)">
+      <span class="range-value" id="convRangeVal">All</span>
+    </div>
+
+    <!-- Alert Filter -->
+    <div class="filter-pills" id="basisAlertFilter">
+      <span style="font-size:12px;color:#888;margin-right:4px;">Alert:</span>
+      <button class="filter-pill active" onclick="setBasisAlert('all')">All</button>
+      <button class="filter-pill" onclick="setBasisAlert('Hi Disc')">🔻Hi Disc</button>
+      <button class="filter-pill" onclick="setBasisAlert('Squeeze')">🚀Squeeze</button>
+      <button class="filter-pill" onclick="setBasisAlert('Bull Trap')">⚠Bull Trap</button>
+      <button class="filter-pill" onclick="setBasisAlert('OI Spike')">⚡OI Spike</button>
+      <button class="filter-pill" onclick="setBasisAlert('Rev')">🔄Reversal</button>
+    </div>
+
+    <div class="section-title">⚖️ Basis Summary (Sorted by Basis %)</div>
+    <div class="table-scroll">
+      <div class="table-wrap">
+        <div class="table-header" style="grid-template-columns: 100px 70px 80px 55px 90px 90px 110px 90px 70px 1fr; min-width: 850px;">
+          <span>Symbol</span><span>Signal</span><span>Basis%</span><span>Conv★</span><span>Basis</span><span>LTP</span><span>Spot</span><span>FV Diff</span><span>Signal</span><span>Alerts</span>
+        </div>
+  `;
+
+  appData.basisSummary.forEach(item => {
+    const basisClass = (item.basis_pct || 0) >= 0 ? 'basis-pos' : 'basis-neg';
+    let cat = 'p';
+    const bp = item.basis_pct;
+    if (bp === null || bp === undefined) cat = 'p';
+    else if (bp < -1) cat = 'dd';
+    else if (bp < 0) cat = 'd';
+    else if (bp === 0) cat = 'p';
+    else if (bp <= 1) cat = 'pm';
+    else cat = 'dp';
+
+    html += `
+        <div class="table-row basis-row" data-cat="${cat}" data-signal="${item.signal}" data-conv="${item.conv_score !== null ? item.conv_score : 0}" data-alerts="${(item.alerts || '').toLowerCase()}" style="grid-template-columns: 100px 70px 80px 55px 90px 90px 110px 90px 70px 1fr; min-width: 900px; cursor:pointer;" onclick="showDetail('${item.symbol}')">
+          <span class="col-symbol">${item.symbol}</span>
+          <span class="col-signal signal-${item.signal}">${item.signal}</span>
+          <span class="col-basis ${basisClass}">${item.basis_pct !== null ? item.basis_pct.toFixed(2) : '-'}</span>
+          <span style="font-weight:700;color:#f0c040;text-align:center;">${item.conv_score !== null ? item.conv_score : '-'}</span>
+          <span>${item.basis !== null ? item.basis.toFixed(1) : '-'}</span>
+          <span>${item.ltp !== null ? item.ltp.toFixed(1) : '-'}</span>
+          <span>${item.spot !== null ? item.spot.toFixed(1) : '-'}</span>
+          <span class="${(item.fv_diff||0)>=0?'basis-pos':'basis-neg'}">${item.fv_diff !== null ? item.fv_diff.toFixed(1) : '-'}</span>
+          <span class="col-signal signal-${item.signal}">${item.signal}</span>
+          <span class="col-alerts">${renderAlerts(item.alerts, item.pattern)}</span>
+        </div>
+    `;
+  });
+  html += `</div></div>`;
+
+  el.innerHTML = html;
+  initTableSorting();
+}
+
+let banSignalFilter = 'all';
+
+function setBanSignal(signal) {
+  banSignalFilter = signal;
+  document.querySelectorAll('#banSignalFilter .filter-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent === (signal === 'all' ? 'All' : signal));
+  });
+  applyBanFilters();
+}
+
+function renderBan(el) {
+  const banList = appData.banList;
+  let html = `
+    <div class="refresh-bar">
+      <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
+    </div>
+    <!-- Signal Filter -->
+    <div class="filter-pills" id="banSignalFilter">
+      <span style="font-size:12px;color:#888;margin-right:4px;">Signal:</span>
+      <button class="filter-pill active" onclick="setBanSignal('all')">All</button>
+      <button class="filter-pill" onclick="setBanSignal('LB')">LB</button>
+      <button class="filter-pill" onclick="setBanSignal('SB')">SB</button>
+      <button class="filter-pill" onclick="setBanSignal('LU')">LU</button>
+      <button class="filter-pill" onclick="setBanSignal('SC')">SC</button>
+    </div>
+
+    <div class="section-title">🚫 Banned Securities</div>
+  `;
+
+  if (banList.length === 0) {
+    html += `<div class="empty" style="padding:40px;">No securities currently banned</div>`;
+  } else {
+    html += `<div class="table-scroll"><div class="table-wrap">`;
+    html += `
+      <div class="table-header" style="grid-template-columns: 120px 70px 90px 110px 90px 90px 90px 70px 1fr; min-width: 800px;">
+        <span>Symbol</span><span>Signal</span><span>Status</span><span>OI</span><span>LTP</span><span>Basis%</span><span>Signal</span><span>Pattern</span>
+      </div>
+    `;
+    banList.forEach(item => {
+      html += `
+        <div class="table-row ban-row" data-signal="${item.signal}" style="grid-template-columns: 120px 70px 90px 110px 90px 90px 90px 70px 1fr; min-width: 860px; cursor:pointer;" onclick="showDetail('${item.symbol}')">
+          <span class="col-symbol" style="color:#ef5350;">${item.symbol}</span>
+          <span class="col-signal signal-${item.signal}">${item.signal}</span>
+          <span style="color:#ef5350;font-weight:600;">🚫 BANNED</span>
+          <span>${formatNumber(item.oi)}</span>
+          <span>${item.ltp !== null ? item.ltp.toFixed(1) : '-'}</span>
+          <span class="${(item.basis_pct||0)>=0?'basis-pos':'basis-neg'}">${item.basis_pct !== null ? item.basis_pct.toFixed(2) : '-'}</span>
+          <span class="col-signal signal-${item.signal}">${item.signal}</span>
+          <span class="col-alerts">${item.pattern || '-'}</span>
+        </div>
+      `;
+    });
+    html += `</div></div>`;
   }
 
-  function apply() {
-    _scanFilter = document.getElementById('sc-search').value.trim().toUpperCase();
-    _scanStrat  = document.getElementById('sc-strat').value;
-    _scanSort   = document.getElementById('sc-sort').value;
+  el.innerHTML = html;
+  initTableSorting();
+}
 
-    // Build flat list {stratCode, stratMeta, ...hit}
-    let list = [];
-    stratCodes.forEach(k => {
-      if(_scanStrat!=='all' && _scanStrat!==k) return;
-      const sm = strats[k];
-      (sm.hits||[]).forEach(h => {
-        if(_scanFilter && !(h.symbol||'').includes(_scanFilter)) return;
-        list.push({ _code:k, _name:sm.name, _emoji:sm.emoji||'', _bias:(sm.bias||'neutral').toLowerCase(), ...h });
+// ============================================
+// SPARKLINE SVG HELPER
+// ============================================
+function renderSparkline(data, color) {
+  if (!data || data.length < 2) return '<span style="color:#555;font-size:10px;">—</span>';
+  const W = 56, H = 22, pad = 2;
+  const mn = Math.min(...data), mx = Math.max(...data);
+  const rng = mx - mn || 1;
+  const pts = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (W - pad * 2);
+    const y = H - pad - ((v - mn) / rng) * (H - pad * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const trend = data[data.length - 1] >= data[0] ? '▲' : '▼';
+  const trendCol = data[data.length - 1] >= data[0] ? '#4caf50' : '#ef5350';
+  return `<span style="display:inline-flex;align-items:center;gap:3px;">
+    <svg width="${W}" height="${H}" style="vertical-align:middle;">
+      <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/>
+    </svg>
+    <span style="color:${trendCol};font-size:10px;font-weight:700;">${trend}</span>
+  </span>`;
+}
+
+// ============================================
+// MID MONTH TAB
+// ============================================
+let midSignal = 'all', midSearch = '';
+
+function setMidSignal(v) {
+  midSignal = v;
+  document.querySelectorAll('#midSignalFilter .filter-pill').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-val') === v));
+  applyMidFilters();
+}
+
+function applyMidFilters() {
+  document.querySelectorAll('.mid-row').forEach(row => {
+    const sig  = row.getAttribute('data-signal');
+    const sym  = row.getAttribute('data-symbol');
+    let show = true;
+    if (midSignal !== 'all' && sig !== midSignal) show = false;
+    if (midSearch && !sym.includes(midSearch)) show = false;
+    row.style.display = show ? '' : 'none';
+  });
+}
+
+function renderMidMonth(el) {
+  const midData = appData.midMonth || [];
+  const exp = appData.expiries.mid || '—';
+  let html = `
+    <div class="refresh-bar">
+      <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
+      <span class="source-info">Mid Month · ${exp} · ${midData.length} contracts</span>
+    </div>
+    <input type="text" class="search-box" id="midSearchBox" placeholder="🔍 Search symbol..."
+      oninput="midSearch=this.value.toLowerCase(); applyMidFilters()">
+
+    <div class="filter-pills" id="midSignalFilter">
+      <span style="font-size:12px;color:#888;margin-right:4px;">Signal:</span>
+      <button class="filter-pill active" data-val="all" onclick="setMidSignal('all')">All</button>
+      <button class="filter-pill" data-val="LB" onclick="setMidSignal('LB')">🔥 LB</button>
+      <button class="filter-pill" data-val="SB" onclick="setMidSignal('SB')">🐻 SB</button>
+      <button class="filter-pill" data-val="LU" onclick="setMidSignal('LU')">💧 LU</button>
+      <button class="filter-pill" data-val="SC" onclick="setMidSignal('SC')">⚡ SC</button>
+    </div>
+
+    <div class="table-scroll">
+      <div class="table-wrap">
+        <div class="table-header" style="grid-template-columns: 110px 55px 55px 80px 90px 90px 110px 90px 80px 1fr; min-width: 920px;">
+          <span>Symbol</span><span>Type</span><span>Signal</span><span>Basis%</span><span>Spot</span><span>LTP</span><span>OI / Chg</span><span>5d OI%</span><span>Conv★</span><span>Pattern / Alerts</span>
+        </div>
+  `;
+
+  if (midData.length === 0) {
+    html += `<div class="empty" style="padding:20px;">No mid month data in snapshot.</div>`;
+  } else {
+    midData.forEach(item => {
+      const basisClass = (item.basis_pct || 0) >= 0 ? 'basis-pos' : 'basis-neg';
+      const oiClass    = (item.oi_chg || 0) >= 0 ? 'oi-up' : 'oi-down';
+      html += `
+        <div class="table-row mid-row"
+          data-symbol="${item.symbol.toLowerCase()}"
+          data-signal="${item.signal || ''}"
+          style="grid-template-columns: 110px 55px 55px 80px 90px 90px 110px 90px 80px 1fr; min-width: 920px; cursor:pointer;"
+          onclick="showDetail('${item.symbol}')">
+          <span class="col-symbol">${item.ban_status==='banned'?'🔴 ':''}${item.symbol}</span>
+          <span style="color:#888;font-size:11px;">${item.type}</span>
+          <span class="col-signal signal-${item.signal}">${item.signal || '—'}</span>
+          <span class="col-basis ${basisClass}">${item.basis_pct !== null ? item.basis_pct.toFixed(2) : '-'}</span>
+          <span>${item.spot ? item.spot.toFixed(1) : '-'}</span>
+          <span>${item.ltp ? item.ltp.toFixed(1) : '-'}</span>
+          <span class="col-oi ${oiClass}">${formatNumber(item.oi)}<br><span class="oi-chg">${(item.oi_chg||0)>=0?'▲':'▼'} ${formatNumber(Math.abs(item.oi_chg||0))}</span></span>
+          <span>${item.oi_5d_pct ? item.oi_5d_pct.toFixed(1)+'%' : '-'}</span>
+          <span style="font-weight:700;color:#f0c040;">${item.conv_score || '-'}</span>
+          <span class="col-alerts">${item.pattern || '—'}${item.alerts ? '<br><span style="font-size:10px;color:#aaa;">'+item.alerts+'</span>' : ''}</span>
+        </div>
+      `;
+    });
+  }
+  html += `</div></div></div>`;
+  el.innerHTML = html;
+  initTableSorting();
+}
+
+// ============================================
+// ROLLOVER TAB
+// ============================================
+let rvSort = 'rolled_pct';
+
+function setRvSort(v) {
+  rvSort = v;
+  document.querySelectorAll('#rvSortFilter .filter-pill').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-val') === v));
+  renderRollover(document.getElementById('content'));
+}
+
+function renderRollover(el) {
+  const expiries = appData.expiries;
+  let rvData = [...(appData.rollover || [])];
+
+  // Sort
+  const sortKeys = {
+    rolled_pct: { key: 'rolled_pct', desc: true },
+    near_oi:    { key: 'near_oi',    desc: true },
+    mid_oi:     { key: 'mid_oi',     desc: true },
+    roll_cost:  { key: 'roll_cost_pct', desc: true },
+    symbol:     { key: 'symbol',     desc: false },
+  };
+  const { key: sk, desc: sd } = sortKeys[rvSort] || sortKeys.rolled_pct;
+  rvData.sort((a, b) => {
+    const av = a[sk], bv = b[sk];
+    if (typeof av === 'string') return sd ? bv.localeCompare(av) : av.localeCompare(bv);
+    return sd ? (bv || 0) - (av || 0) : (av || 0) - (bv || 0);
+  });
+
+  // Summary stats
+  const high = rvData.filter(r => r.rolled_pct > 60).length;
+  const low  = rvData.filter(r => r.rolled_pct < 20 && r.mid_oi > 0).length;
+  const avgRolled = rvData.length ? (rvData.reduce((s,r) => s + r.rolled_pct, 0) / rvData.length).toFixed(1) : 0;
+
+  let html = `
+    <div class="refresh-bar">
+      <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
+      <span class="source-info">${rvData.length} symbols · Near: ${expiries.near||'—'} → Mid: ${expiries.mid||'—'}</span>
+    </div>
+
+    <!-- Summary bar -->
+    <div style="display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
+      <div style="background:#1a3a1a;border:1px solid #2a5a2a;border-radius:8px;padding:8px 14px;font-size:12px;">
+        <span style="color:#888;">High Rollover (&gt;60%)</span><br>
+        <span style="color:#4caf50;font-size:20px;font-weight:700;">${high}</span>
+        <span style="color:#888;font-size:11px;"> symbols</span>
+      </div>
+      <div style="background:#3a1a1a;border:1px solid #5a2a2a;border-radius:8px;padding:8px 14px;font-size:12px;">
+        <span style="color:#888;">Low Rollover (&lt;20%)</span><br>
+        <span style="color:#ef5350;font-size:20px;font-weight:700;">${low}</span>
+        <span style="color:#888;font-size:11px;"> symbols</span>
+      </div>
+      <div style="background:#1a2a3a;border:1px solid #2a4a5a;border-radius:8px;padding:8px 14px;font-size:12px;">
+        <span style="color:#888;">Avg Rolled%</span><br>
+        <span style="color:#4fc3f7;font-size:20px;font-weight:700;">${avgRolled}%</span>
+      </div>
+    </div>
+
+    <!-- Info banner -->
+    <div style="background:#16213e;border:1px solid #2a3a5a;border-radius:8px;padding:8px 14px;margin-bottom:10px;font-size:11px;color:#888;">
+      📖 <b>Rolled%</b> = Mid OI ÷ (Near + Mid) × 100 &nbsp;|&nbsp;
+      <span style="color:#4caf50;">▶ &gt;60% Bullish</span> (longs rolling forward) &nbsp;|&nbsp;
+      <span style="color:#ef5350;">▶ &lt;20% Caution</span> (squaring off) &nbsp;|&nbsp;
+      <b>Roll Cost%</b> = Mid Basis% − Near Basis%
+    </div>
+
+    <!-- Sort pills -->
+    <div class="filter-pills" id="rvSortFilter">
+      <span style="font-size:12px;color:#888;margin-right:4px;">Sort:</span>
+      <button class="filter-pill ${rvSort==='rolled_pct'?'active':''}" data-val="rolled_pct" onclick="setRvSort('rolled_pct')">Rolled% ↓</button>
+      <button class="filter-pill ${rvSort==='near_oi'?'active':''}"    data-val="near_oi"    onclick="setRvSort('near_oi')">Near OI ↓</button>
+      <button class="filter-pill ${rvSort==='mid_oi'?'active':''}"     data-val="mid_oi"     onclick="setRvSort('mid_oi')">Mid OI ↓</button>
+      <button class="filter-pill ${rvSort==='roll_cost'?'active':''}"  data-val="roll_cost"  onclick="setRvSort('roll_cost')">Roll Cost ↓</button>
+      <button class="filter-pill ${rvSort==='symbol'?'active':''}"     data-val="symbol"     onclick="setRvSort('symbol')">A-Z</button>
+    </div>
+
+    <div class="table-scroll">
+      <div class="table-wrap">
+        <div class="table-header" style="grid-template-columns: 105px 42px 50px 95px 85px 95px 85px 75px 85px 85px 85px 50px; min-width: 1020px;">
+          <span>Symbol</span><span>Type</span><span>Lot</span><span>Near Exp</span><span>Near OI</span><span>Mid Exp</span><span>Mid OI</span><span>Rolled%</span><span>Roll Cost%</span><span>Near Basis%</span><span>Mid Basis%</span><span>Days</span>
+        </div>
+  `;
+
+  if (rvData.length === 0) {
+    html += `<div class="empty" style="padding:20px;">No rollover data in snapshot.</div>`;
+  } else {
+    rvData.forEach(item => {
+      const rp = item.rolled_pct || 0;
+      const rpColor  = rp > 60 ? '#4caf50' : rp < 20 && item.mid_oi > 0 ? '#ef5350' : '#b0b0c0';
+      const rpBold   = (rp > 60 || (rp < 20 && item.mid_oi > 0)) ? 'font-weight:700;' : '';
+      const rcColor  = (item.roll_cost_pct || 0) > 0.3 ? '#ef5350' : (item.roll_cost_pct || 0) < -0.3 ? '#4caf50' : '#b0b0c0';
+      const nbClass  = (item.near_basis_pct || 0) >= 0 ? 'basis-pos' : 'basis-neg';
+      const mbClass  = (item.mid_basis_pct  || 0) >= 0 ? 'basis-pos' : 'basis-neg';
+      html += `
+        <div class="table-row" style="grid-template-columns: 105px 42px 50px 95px 85px 95px 85px 75px 85px 85px 85px 50px; min-width: 1020px;">
+          <span class="col-symbol">${item.symbol}</span>
+          <span style="color:#888;font-size:11px;">${item.type}</span>
+          <span style="color:#888;">${item.lot || '—'}</span>
+          <span style="font-size:11px;color:#4fc3f7;">${item.near_expiry}</span>
+          <span>${formatNumber(item.near_oi)}</span>
+          <span style="font-size:11px;color:#ffa726;">${item.mid_expiry || '—'}</span>
+          <span>${item.mid_oi ? formatNumber(item.mid_oi) : '—'}</span>
+          <span style="color:${rpColor};${rpBold}">${item.mid_oi ? rp.toFixed(1)+'%' : '—'}</span>
+          <span style="color:${rcColor};">${item.near_basis_pct ? (item.roll_cost_pct >= 0 ? '+' : '') + (item.roll_cost_pct||0).toFixed(2) + '%' : '—'}</span>
+          <span class="${nbClass}">${item.near_basis_pct ? item.near_basis_pct.toFixed(2)+'%' : '—'}</span>
+          <span class="${mbClass}">${item.mid_basis_pct && item.mid_oi ? item.mid_basis_pct.toFixed(2)+'%' : '—'}</span>
+          <span style="color:#888;">${item.days_to_near}</span>
+        </div>
+      `;
+    });
+  }
+  html += `</div></div></div>`;
+  el.innerHTML = html;
+  initTableSorting();
+}
+
+// ============================================
+// SYMBOL DETAIL MODAL
+// ============================================
+function showDetail(symbol) {
+  const item = appData.allSymbolMap[symbol] || appData.tracker.find(x => x.symbol === symbol);
+  if (!item) return;
+
+  document.getElementById('modalSymbol').textContent = symbol;
+
+  const trendColors = { LB: '#27ae60', SB: '#ef5350', LU: '#42a5f5', SC: '#f1c40f' };
+  const trendLabels = { LB: '🔥 Long Buildup', SB: '🐻 Short Buildup', LU: '💧 Long Unwinding', SC: '⚡ Short Covering' };
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="detail-grid">
+      <div class="detail-signal" style="background:${trendColors[item.signal] || '#5a6a7a'}20; color:${trendColors[item.signal] || '#fff'}">
+        ${trendLabels[item.signal] || '—'}
+      </div>
+      <div class="detail-item"><div class="detail-label">Spot Price</div><div class="detail-value">₹${item.spot !== null ? item.spot.toLocaleString('en-IN', {maximumFractionDigits:2}) : '—'}</div></div>
+      <div class="detail-item"><div class="detail-label">Fut Price</div><div class="detail-value">₹${item.ltp !== null ? item.ltp.toLocaleString('en-IN', {maximumFractionDigits:2}) : '—'}</div></div>
+      <div class="detail-item"><div class="detail-label">Basis %</div><div class="detail-value" style="color:${item.basis_pct > 0 ? '#66bb6a' : '#ef5350'}">${item.basis_pct !== null ? (item.basis_pct >= 0 ? '+' : '') + item.basis_pct.toFixed(2) + '%' : '—'}</div></div>
+      <div class="detail-item"><div class="detail-label">Fair Value</div><div class="detail-value">₹${item.fair_value !== null ? item.fair_value.toLocaleString('en-IN', {maximumFractionDigits:2}) : '—'}</div></div>
+      <div class="detail-item"><div class="detail-label">FV Diff</div><div class="detail-value" style="color:${(item.fv_diff||0) >= 0 ? '#66bb6a' : '#ef5350'}">${item.fv_diff !== null ? (item.fv_diff >= 0 ? '+' : '') + item.fv_diff.toFixed(2) : '—'}</div></div>
+      <div class="detail-item"><div class="detail-label">Conv★</div><div class="detail-value">${item.conv_score !== null ? item.conv_score : '—'}</div></div>
+      <div class="detail-item"><div class="detail-label">Open Interest</div><div class="detail-value">${formatNumber(item.oi)}</div></div>
+      <div class="detail-item"><div class="detail-label">OI Change</div><div class="detail-value" style="color:${(item.oi_chg||0) >= 0 ? '#66bb6a' : '#ef5350'}">${item.oi_chg !== null ? (item.oi_chg >= 0 ? '+' : '') + formatNumber(item.oi_chg) : '—'}</div></div>
+      <div class="detail-item"><div class="detail-label">OI 5d %</div><div class="detail-value">${item.oi_5d_pct !== null ? item.oi_5d_pct.toFixed(1) + '%' : '—'}</div></div>
+      <div class="detail-item"><div class="detail-label">Price Chg</div><div class="detail-value" style="color:${(item.price_chg||0) >= 0 ? '#66bb6a' : '#ef5350'}">${item.price_chg !== null ? (item.price_chg >= 0 ? '+' : '') + item.price_chg.toFixed(1) : '—'}</div></div>
+    </div>
+    ${item.pattern && item.pattern !== '—' ? `<div style="margin-bottom:12px"><div style="font-size:11px;color:#888;margin-bottom:4px;">Pattern</div><div style="font-size:16px;font-weight:600">${item.pattern}</div></div>` : ''}
+    ${item.alerts ? `<div><div style="font-size:11px;color:#888;margin-bottom:4px;">Alerts</div><div style="font-size:14px;color:#ccc;line-height:1.6">${renderAlerts(item.alerts, '')}</div></div>` : ''}
+  `;
+
+  document.getElementById('detailModal').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('detailModal').classList.remove('active');
+}
+
+
+// ============================================
+// TABLE SORTING
+// ============================================
+let tableSortState = {}; // tableId -> { colIndex, direction }
+
+function initTableSorting() {
+  // Find all table-wrap containers and attach sort handlers
+  document.querySelectorAll('.table-wrap').forEach((tableWrap, tableIndex) => {
+    const headerRow = tableWrap.querySelector('.table-header');
+    if (!headerRow) return;
+
+    const headers = headerRow.querySelectorAll('span');
+    headers.forEach((header, colIndex) => {
+      // Skip if already has click handler (check by data attribute)
+      if (header.hasAttribute('data-sortable')) return;
+
+      header.setAttribute('data-sortable', 'true');
+      header.setAttribute('data-col', colIndex);
+      header.setAttribute('data-table', tableIndex);
+      header.style.cursor = 'pointer';
+
+      header.addEventListener('click', function() {
+        sortTable(tableWrap, colIndex, this);
       });
     });
-    list.sort((a,b)=>{
-      if(_scanSort==='sym_asc') return (a.symbol||'').localeCompare(b.symbol||'');
-      return (b.score||0)-(a.score||0);
-    });
+  });
+}
 
-    document.getElementById('sc-count').textContent=list.length+' setup'+(list.length!==1?'s':'');
-    document.getElementById('sc-cards').innerHTML = list.map(r=>{
-      const bias  = r._bias;
-      const bCls  = BIAS_CLS[bias] || 'strat-neutral';
-      const bLbl  = BIAS_LBL[bias] || '● Neutral';
-      const score = parseFloat(r.score||0);
-      const maxS  = 10;
-      const pct   = Math.min(score/maxS*100,100);
-      const confCl= score>=7?'var(--green)':score>=4?'var(--accent)':'var(--amber)';
-      const bp    = parseFloat(r.basis_pct||0);
-      return`<div class="strat-card" onclick='showStratSheet(${JSON.stringify(r)})'>
-        <div class="strat-header">
-          <div>
-            <div class="strat-sym">${ban_badge(r)}${r.symbol}</div>
-            <div style="font-size:11px;color:var(--fg2);margin-top:2px">${r._emoji} ${r._name}</div>
-          </div>
-          <div style="text-align:right">
-            <span class="strat-type ${bCls}">${bLbl}</span>
-            <div style="font-size:11px;margin-top:4px;color:${confCl};font-weight:700">${score.toFixed(0)}/10</div>
-          </div>
-        </div>
-        <div class="strat-row">
-          <span>LTP <strong>₹${(r.ltp||0).toFixed(2)}</strong></span>
-          <span>Basis <strong class="${bp>=0?'up':'down'}">${bp>=0?'+':''}${bp.toFixed(2)}%</strong></span>
-          <span>Conv <strong>${(r.conv_score||0).toFixed(1)}</strong></span>
-          <span>${r.days_to_exp||'—'}d exp</span>
-          <span>Lot <strong>${r.lot_size||r.lot||'—'}</strong></span>
-        </div>
-        ${r.explanation?`<div style="font-size:10px;color:var(--fg2);margin-top:6px;font-style:italic">${r.explanation}</div>`:''}
-        <div class="strat-conf"><div class="strat-conf-fill" style="width:${pct.toFixed(0)}%;background:${confCl}"></div></div>
+function sortTable(tableWrap, colIndex, headerEl) {
+  const tableId = tableWrap.getAttribute('id') || 'table_' + Math.random().toString(36).substr(2, 9);
+  if (!tableWrap.getAttribute('id')) tableWrap.setAttribute('id', tableId);
+
+  // Get current sort state for this table
+  let currentSort = tableSortState[tableId] || { colIndex: -1, direction: 'desc' };
+
+  // Determine new direction: if same column, toggle; if new column, start desc
+  let newDirection;
+  if (currentSort.colIndex === colIndex) {
+    newDirection = currentSort.direction === 'desc' ? 'asc' : 'desc';
+  } else {
+    newDirection = 'desc';
+  }
+
+  tableSortState[tableId] = { colIndex: colIndex, direction: newDirection };
+
+  // Update header visual indicators
+  const headerRow = tableWrap.querySelector('.table-header');
+  headerRow.querySelectorAll('span').forEach(h => {
+    h.classList.remove('sort-asc', 'sort-desc');
+  });
+  headerEl.classList.add(newDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+
+  // Get all data rows (skip header)
+  const rows = Array.from(tableWrap.querySelectorAll('.table-row'));
+
+  // Sort rows
+  rows.sort((a, b) => {
+    let aVal = getCellValue(a, colIndex);
+    let bVal = getCellValue(b, colIndex);
+
+    // Determine if numeric
+    const aNum = parseNumericValue(aVal);
+    const bNum = parseNumericValue(bVal);
+
+    let comparison;
+    if (aNum !== null && bNum !== null) {
+      comparison = aNum - bNum;
+    } else {
+      comparison = String(aVal).localeCompare(String(bVal), undefined, { numeric: true, sensitivity: 'base' });
+    }
+
+    return newDirection === 'asc' ? comparison : -comparison;
+  });
+
+  // Re-append rows in new order
+  rows.forEach(row => {
+    // Check if row is currently visible (respecting filters)
+    const wasVisible = row.style.display !== 'none';
+    tableWrap.appendChild(row);
+    // Restore visibility if it was hidden by filters
+    if (!wasVisible) row.style.display = 'none';
+  });
+}
+
+function getCellValue(row, colIndex) {
+  const cells = row.querySelectorAll('span, .col-symbol, .col-signal, .col-basis, .col-oi, .col-price, .col-alerts');
+  if (colIndex >= cells.length) return '';
+
+  const cell = cells[colIndex];
+  // Get text content, remove arrows and formatting
+  let text = cell.textContent || cell.innerText || '';
+  text = text.replace(/[▲▼]/g, '').trim();
+
+  // For OI/Chg column (which has two lines), extract the first number (OI value)
+  // or if sorting by change, extract the second number
+  if (cell.classList.contains('col-oi') && text.includes('\n')) {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    // Return first line (OI value) for sorting - the change value is secondary
+    text = lines[0] || text;
+  }
+
+  return text;
+}
+
+function parseNumericValue(val) {
+  if (val === null || val === undefined || val === '-' || val === '') return null;
+
+  // Remove currency symbols, commas, spaces, newlines
+  let clean = String(val).replace(/[₹,\n\r]/g, '').replace(/\s/g, '');
+
+  // Handle Cr/L/K suffixes (case insensitive)
+  const upper = clean.toUpperCase();
+  if (upper.endsWith('CR')) {
+    return parseFloat(clean.replace(/cr/i, '')) * 10000000;
+  }
+  if (upper.endsWith('L')) {
+    return parseFloat(clean.replace(/l/i, '')) * 100000;
+  }
+  if (upper.endsWith('K')) {
+    return parseFloat(clean.replace(/k/i, '')) * 1000;
+  }
+
+  // Handle percentage
+  if (clean.endsWith('%')) {
+    return parseFloat(clean.replace('%', ''));
+  }
+
+  // Try parsing as float
+  const num = parseFloat(clean);
+  return isNaN(num) ? null : num;
+}
+
+// ============================================
+// HELPERS
+// ============================================
+function formatNumber(n) {
+  if (n === null || n === undefined) return '-';
+  if (Math.abs(n) >= 10000000) return (n/10000000).toFixed(1) + 'Cr';
+  if (Math.abs(n) >= 100000) return (n/100000).toFixed(1) + 'L';
+  if (Math.abs(n) >= 1000) return (n/1000).toFixed(1) + 'K';
+  return n.toString();
+}
+
+function renderAlerts(alerts, pattern) {
+  let html = '';
+  if (pattern && pattern !== '↓→▼→▲' && pattern !== '↑→▼→↓' && pattern !== '▼→▲→▼' && 
+      pattern !== 'SC×2' && pattern !== 'LB×2' && pattern !== 'LU×2' && pattern !== 'SB×2' &&
+      pattern !== '▲→▲→↑' && pattern !== '▼→▼→↓' && pattern !== '↑→↑→↓' && pattern !== '↓→↓→↑') {
+    html += `<span style="color:#888;margin-right:4px;">${pattern}</span>`;
+  }
+  if (alerts && alerts.trim()) {
+    const list = alerts.split('|').map(a => a.trim()).filter(Boolean);
+    list.forEach(a => {
+      html += `<span class="alert-tag ${getAlertClass(a)}">${a}</span>`;
+    });
+  }
+  return html || '-';
+}
+
+function getAlertClass(alert) {
+  if (alert.includes('Hi Disc')) return 'alert-hidisc';
+  if (alert.includes('Squeeze')) return 'alert-squeeze';
+  if (alert.includes('Bull Trap')) return 'alert-bulltrap';
+  if (alert.includes('OI Spike')) return 'alert-oispike';
+  if (alert.includes('Rev↓') || alert.includes('Re-Short')) return 'alert-reshort';
+  if (alert.includes('Rev↑') || alert.includes('Recovery')) return 'alert-recovery';
+  return 'alert-tag';
+}
+
+// ============================================
+// INTERACTION
+// ============================================
+function showTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  render();
+}
+
+function setFilter(filter) {
+  dashboardFilter = filter;
+  renderDashboard(document.getElementById('content'));
+}
+
+function filterTracker() {
+  const q = document.getElementById('searchBox')?.value.toLowerCase() || '';
+  document.querySelectorAll('.tracker-row').forEach(row => {
+    const sym = row.getAttribute('data-symbol');
+    if (!sym.includes(q)) { row.style.display = 'none'; return; }
+    row.style.display = '';
+  });
+  // Re-apply pill filters on top of search
+  applyTrackerFilters();
+}
+
+
+// ============================================
+// DASHBOARD FILTERS
+// ============================================
+let dashPattern = 'all';
+let oiChgVisible = false;
+
+function setDashPattern(pattern) {
+  dashPattern = pattern;
+  document.querySelectorAll('#dashPatternFilter .filter-pill').forEach(btn => {
+    const btnText = btn.textContent.replace(/[🚀⚠⚡🔻🔄]/g, '').trim().toLowerCase();
+    const patMap = { 'all': 'all', 'squeeze': 'squeeze', 'bull': 'bull trap', 'spike': 'oi spike', 'hidisc': 'hi disc', 'rev': 'reversal' };
+    btn.classList.toggle('active', btnText === patMap[pattern]);
+  });
+  applyDashFilters();
+}
+
+function toggleOIChg() {
+  oiChgVisible = !oiChgVisible;
+  const btn = document.getElementById('oiToggleBtn');
+  if (btn) btn.textContent = 'OI Chg: ' + (oiChgVisible ? 'ON' : 'OFF');
+  if (btn) btn.classList.toggle('active', oiChgVisible);
+
+  // Re-render dashboard to show/hide OI Chg column
+  renderDashboard(document.getElementById('content'));
+}
+
+function applyDashFilters() {
+  document.querySelectorAll('.dash-row').forEach(row => {
+    const pattern = row.getAttribute('data-pattern') || '';
+    const alerts = row.getAttribute('data-alerts') || '';
+    let show = true;
+    if (dashPattern !== 'all') {
+      const patMap = { 'squeeze': 'squeeze', 'bull': 'bull trap', 'spike': 'oi spike', 'hidisc': 'hi disc', 'rev': 'reversal' };
+      const searchTerm = patMap[dashPattern];
+      if (!pattern.includes(searchTerm) && !alerts.includes(searchTerm)) show = false;
+    }
+    row.style.display = show ? '' : 'none';
+  });
+}
+
+// ============================================
+// TRACKER FILTERS
+// ============================================
+let trackerSignal = 'all';
+
+function setTrackerSignal(signal) {
+  trackerSignal = signal;
+  document.querySelectorAll('#signalFilter .filter-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent === (signal === 'all' ? 'All' : signal));
+  });
+  applyTrackerFilters();
+}
+
+let trackerPattern = 'all';
+let trackerAlert = 'all';
+let trackerBasisCat = 'all';
+
+function setTrackerPattern(pattern) {
+  trackerPattern = pattern;
+  document.querySelectorAll('#patternFilter .filter-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent === (pattern === 'all' ? 'All' : pattern));
+  });
+  applyTrackerFilters();
+}
+
+function setTrackerAlert(alert) {
+  trackerAlert = alert;
+  document.querySelectorAll('#alertFilter .filter-pill').forEach(btn => {
+    const btnText = btn.textContent.replace(/[🔻🚀⚠⚡🔄]/g, '').trim();
+    const isMatch = alert === 'all' ? btn.textContent === 'All' : btnText.includes(alert.replace('Hi Disc', 'Hi Disc').replace('Rev', 'Rev'));
+    btn.classList.toggle('active', isMatch);
+  });
+  applyTrackerFilters();
+}
+
+
+
+function setTrackerBasis(cat) {
+  trackerBasisCat = cat;
+  const map = { 'all': 'All', 'dd': 'Deep Disc', 'd': 'Discount', 'p': 'Parity', 'pm': 'Premium', 'dp': 'Deep Prem' };
+  document.querySelectorAll('#basisFilter .filter-pill').forEach(btn => {
+    const btnText = btn.textContent.replace(/[🔴🟠⚪🔵🟢]/g, '').trim();
+    btn.classList.toggle('active', btnText === (cat === 'all' ? 'All' : map[cat]));
+  });
+  applyTrackerFilters();
+}
+
+function applyTrackerFilters() {
+  document.querySelectorAll('.tracker-row').forEach(row => {
+    const signal = row.getAttribute('data-signal');
+    const alerts = row.getAttribute('data-alerts') || '';
+    const basisCat = row.getAttribute('data-basiscat') || 'p';
+    const patternText = row.getAttribute('data-pattern') || '';
+
+    let show = true;
+    if (trackerSignal !== 'all' && signal !== trackerSignal) show = false;
+    if (trackerPattern !== 'all' && !patternText.includes(trackerPattern)) show = false;
+    if (trackerAlert !== 'all' && !alerts.includes(trackerAlert.toLowerCase())) show = false;
+    if (trackerBasisCat !== 'all' && basisCat !== trackerBasisCat) show = false;
+    row.style.display = show ? '' : 'none';
+  });
+}
+
+// ============================================
+// OI FILTERS
+// ============================================
+let oiAlertFilter = 'all';
+let oiSignalFilter = 'all';
+
+function setOISignal(signal) {
+  oiSignalFilter = signal;
+  document.querySelectorAll('#oiSignalFilter .filter-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent === (signal === 'all' ? 'All' : signal));
+  });
+  applyOIFilters();
+}
+
+let oiSectionFilter = 'all';
+
+function setOISection(section) {
+  oiSectionFilter = section;
+  document.querySelectorAll('#oiToggleFilter .filter-pill').forEach(btn => {
+    const btnText = btn.textContent.replace(/[🔥❄️]/g, '').trim().toLowerCase();
+    const secMap = { 'all': 'all', 'gainers': 'gainers', 'losers': 'losers' };
+    btn.classList.toggle('active', btnText === secMap[section]);
+  });
+  applyOISectionFilter();
+}
+
+function applyOISectionFilter() {
+  // Show/hide entire sections
+  document.querySelectorAll('.oi-section').forEach(title => {
+    const sec = title.getAttribute('data-section');
+    let show = true;
+    if (oiSectionFilter !== 'all' && sec !== oiSectionFilter) show = false;
+
+    // Hide/show the title and its next sibling table-scroll
+    title.style.display = show ? '' : 'none';
+    const tableScroll = title.nextElementSibling;
+    if (tableScroll && tableScroll.classList.contains('table-scroll')) {
+      tableScroll.style.display = show ? '' : 'none';
+    }
+  });
+  // Also apply alert filters within visible sections
+  applyOIFilters();
+}
+
+function setOIAlert(alert) {
+  oiAlertFilter = alert;
+  document.querySelectorAll('#oiAlertFilter .filter-pill').forEach(btn => {
+    const btnText = btn.textContent.replace(/[🔻🚀⚠⚡🔄]/g, '').trim();
+    const isMatch = alert === 'all' ? btn.textContent === 'All' : btnText.includes(alert.replace('Hi Disc', 'Hi Disc').replace('Rev', 'Rev'));
+    btn.classList.toggle('active', isMatch);
+  });
+  applyOIFilters();
+}
+
+function applyOIFilters() {
+  document.querySelectorAll('.oi-row').forEach(row => {
+    const signal = row.getAttribute('data-signal');
+    const alerts = row.getAttribute('data-alerts') || '';
+    let show = true;
+    if (oiSignalFilter !== 'all' && signal !== oiSignalFilter) show = false;
+    if (oiAlertFilter !== 'all' && !alerts.includes(oiAlertFilter.toLowerCase())) show = false;
+    row.style.display = show ? '' : 'none';
+  });
+  // If section filter is active, ensure rows in hidden sections are also hidden
+  if (oiSectionFilter !== 'all') {
+    document.querySelectorAll('.oi-section').forEach(title => {
+      const sec = title.getAttribute('data-section');
+      if (sec !== oiSectionFilter) {
+        const tableScroll = title.nextElementSibling;
+        if (tableScroll) {
+          tableScroll.querySelectorAll('.oi-row').forEach(row => row.style.display = 'none');
+        }
+      }
+    });
+  }
+}
+
+// ============================================
+// BASIS FILTERS
+// ============================================
+let basisSignalFilter = 'all';
+
+function setBasisSignal(signal) {
+  basisSignalFilter = signal;
+  document.querySelectorAll('#basisSignalFilter .filter-pill').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent === (signal === 'all' ? 'All' : signal));
+  });
+  applyBasisFilters();
+}
+
+let basisCatFilter = 'all';
+let basisAlertFilter = 'all';
+
+function setBasisCat(cat) {
+  basisCatFilter = cat;
+  document.querySelectorAll('#basisCatFilter .filter-pill').forEach(btn => {
+    const btnText = btn.textContent.replace(/[🔴🟠⚪🔵🟢]/g, '').trim();
+    const map = { 'all': 'All', 'dd': 'Deep Disc', 'd': 'Discount', 'p': 'Parity', 'pm': 'Premium', 'dp': 'Deep Prem' };
+    const isMatch = cat === 'all' ? btn.textContent === 'All' : btnText.includes(map[cat]);
+    btn.classList.toggle('active', isMatch);
+  });
+  applyBasisFilters();
+}
+
+function setBasisAlert(alert) {
+  basisAlertFilter = alert;
+  document.querySelectorAll('#basisAlertFilter .filter-pill').forEach(btn => {
+    const btnText = btn.textContent.replace(/[🔻🚀⚠⚡🔄]/g, '').trim();
+    const isMatch = alert === 'all' ? btn.textContent === 'All' : btnText.includes(alert.replace('Hi Disc', 'Hi Disc').replace('Rev', 'Rev'));
+    btn.classList.toggle('active', isMatch);
+  });
+  applyBasisFilters();
+}
+
+let basisConvMin = 0;
+
+function filterBasisConv(val) {
+  basisConvMin = parseInt(val);
+  document.getElementById('convRangeVal').textContent = basisConvMin === 0 ? 'All' : '≥ ' + basisConvMin;
+  applyBasisFilters();
+}
+
+function applyBasisFilters() {
+  document.querySelectorAll('.basis-row').forEach(row => {
+    const cat = row.getAttribute('data-cat');
+    const signal = row.getAttribute('data-signal');
+    const alerts = row.getAttribute('data-alerts') || '';
+    const conv = parseInt(row.getAttribute('data-conv') || 0);
+    let show = true;
+    if (basisSignalFilter !== 'all' && signal !== basisSignalFilter) show = false;
+    if (basisCatFilter !== 'all' && cat !== basisCatFilter) show = false;
+    if (basisAlertFilter !== 'all' && !alerts.includes(basisAlertFilter.toLowerCase())) show = false;
+    if (basisConvMin > 0 && conv < basisConvMin) show = false;
+    row.style.display = show ? '' : 'none';
+  });
+}
+
+
+// ============================================
+// MARKET PULSE TAB
+// ============================================
+function renderPulse(el) {
+  const { signalCounts, signalBreakdown, oiMovers, alerts, banList, meta, nearMonth } = appData;
+  const expiries = appData.expiries || {};
+
+  // Index summary from near month
+  const idxRows = nearMonth.filter(r => r.type === 'IDX' || ['NIFTY','BANKNIFTY','MIDCPNIFTY','FINNIFTY','NIFTYNXT50'].includes(r.symbol));
+  function idx(sym) { return idxRows.find(r => r.symbol === sym); }
+  const nifty = idx('NIFTY'), bnf = idx('BANKNIFTY'), midcp = idx('MIDCPNIFTY'), fin = idx('FINNIFTY');
+
+  function pChg(r) {
+    if (!r) return null;
+    const ltp = r.ltp || 0, pc = r.price_chg || 0, prev = ltp - pc;
+    return prev > 1 ? pc/prev*100 : 0;
+  }
+
+  function idxCard(r, label) {
+    if (!r) return `<div class="card" style="opacity:0.4"><div class="card-icon">—</div><div class="card-count">—</div><div class="card-label">${label}</div></div>`;
+    const chg = pChg(r);
+    const col = chg >= 0 ? '#66bb6a' : '#ef5350';
+    const arr = chg >= 0 ? '▲' : '▼';
+    return `<div class="card" onclick="showDetail('${r.symbol}')" style="cursor:pointer;border-color:${col}30;">
+      <div class="card-icon">${chg >= 0 ? '📈' : '📉'}</div>
+      <div class="card-count" style="color:${col};font-size:20px;">₹${r.ltp ? r.ltp.toLocaleString('en-IN',{maximumFractionDigits:0}) : '—'}</div>
+      <div style="font-size:12px;color:${col};margin-top:2px;">${arr} ${Math.abs(chg).toFixed(2)}%</div>
+      <div class="card-label">${label}</div>
+    </div>`;
+  }
+
+  // Advance/Decline
+  const adv  = nearMonth.filter(r => (r.price_chg||0) > 0).length;
+  const decl = nearMonth.filter(r => (r.price_chg||0) < 0).length;
+  const unch = nearMonth.length - adv - decl;
+  const total = signalCounts.LB + signalCounts.SB + signalCounts.LU + signalCounts.SC;
+  const gainers5 = [...nearMonth].sort((a,b) => (pChg(b)||0)-(pChg(a)||0)).slice(0,5);
+  const losers5  = [...nearMonth].sort((a,b) => (pChg(a)||0)-(pChg(b)||0)).slice(0,5);
+
+  let html = `
+    <div class="refresh-bar">
+      <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
+      <span class="source-info">Data: ${meta.date_fmt || '—'} · ${nearMonth.length} contracts</span>
+    </div>
+
+    <!-- Index Cards -->
+    <div class="section-title">Index Futures</div>
+    <div class="cards-grid" style="grid-template-columns:repeat(2,1fr);">
+      ${idxCard(nifty,  'NIFTY')}
+      ${idxCard(bnf,    'BANKNIFTY')}
+      ${idxCard(midcp,  'MIDCPNIFTY')}
+      ${idxCard(fin,    'FINNIFTY')}
+    </div>
+
+    <!-- Signal Summary -->
+    <div class="section-title">Signal Breakdown</div>
+    <div class="cards-grid">
+      <div class="card lb"><div class="card-icon">🔥</div><div class="card-count">${signalCounts.LB}</div><div class="card-label">Long Buildup</div><div style="font-size:10px;color:#888;margin-top:3px;">Price↑ OI↑</div></div>
+      <div class="card sb"><div class="card-icon">🐻</div><div class="card-count">${signalCounts.SB}</div><div class="card-label">Short Buildup</div><div style="font-size:10px;color:#888;margin-top:3px;">Price↓ OI↑</div></div>
+      <div class="card lu"><div class="card-icon">💧</div><div class="card-count">${signalCounts.LU}</div><div class="card-label">Long Unwinding</div><div style="font-size:10px;color:#888;margin-top:3px;">Price↓ OI↓</div></div>
+      <div class="card sc"><div class="card-icon">⚡</div><div class="card-count">${signalCounts.SC}</div><div class="card-label">Short Covering</div><div style="font-size:10px;color:#888;margin-top:3px;">Price↑ OI↓</div></div>
+    </div>
+
+    <!-- Advance / Decline -->
+    <div class="section-title">Advance / Decline</div>
+    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+      <div style="background:#1a3a1a;border:1px solid #2a5a2a;border-radius:8px;padding:10px 18px;text-align:center;min-width:80px;">
+        <div style="font-size:24px;font-weight:700;color:#66bb6a;">${adv}</div>
+        <div style="font-size:11px;color:#888;">Advancing</div>
+      </div>
+      <div style="background:#3a1a1a;border:1px solid #5a2a2a;border-radius:8px;padding:10px 18px;text-align:center;min-width:80px;">
+        <div style="font-size:24px;font-weight:700;color:#ef5350;">${decl}</div>
+        <div style="font-size:11px;color:#888;">Declining</div>
+      </div>
+      <div style="background:#16213e;border:1px solid #2a2a4a;border-radius:8px;padding:10px 18px;text-align:center;min-width:80px;">
+        <div style="font-size:24px;font-weight:700;color:#888;">${unch}</div>
+        <div style="font-size:11px;color:#888;">Unchanged</div>
+      </div>
+      <div style="background:#16213e;border:1px solid #2a3a5a;border-radius:8px;padding:10px 18px;text-align:center;min-width:80px;">
+        <div style="font-size:24px;font-weight:700;color:#4fc3f7;">${total}</div>
+        <div style="font-size:11px;color:#888;">Signals</div>
+      </div>
+    </div>
+
+    <!-- Signal Detail Breakdown (from signal_breakdown if present) -->`;
+
+  const sbKeys = Object.keys(appData.signalBreakdown);
+  if (sbKeys.length) {
+    const sigLabels = { LB:'🔥 Long Buildup', SB:'🐻 Short Buildup', LU:'💧 Long Unwinding', SC:'⚡ Short Covering' };
+    html += `<div class="section-title">Top Signals (Near Month)</div>`;
+    ['LB','SB','SC','LU'].forEach(sig => {
+      const rows = appData.signalBreakdown[sig] || [];
+      if (!rows.length) return;
+      html += `<div style="margin-bottom:14px;">
+        <div style="font-size:12px;color:#888;font-weight:600;margin-bottom:6px;">${sigLabels[sig]||sig} (${rows.length})</div>
+        <div class="table-scroll"><div class="table-wrap">
+          <div class="table-header" style="grid-template-columns:100px 70px 80px 80px 80px 1fr;min-width:560px;">
+            <span>Symbol</span><span>Signal</span><span>LTP</span><span>OI Chg</span><span>Basis%</span><span>Pattern/Alerts</span>
+          </div>`;
+      rows.slice(0,8).forEach(r => {
+        const bp = r.basis_pct;
+        const bpCls = (bp||0) >= 0 ? 'basis-pos' : 'basis-neg';
+        const oc = r.oi_chg || 0;
+        html += `<div class="table-row" style="grid-template-columns:100px 70px 80px 80px 80px 1fr;min-width:560px;cursor:pointer;" onclick="showDetail('${r.symbol}')">
+          <span class="col-symbol">${r.symbol}</span>
+          <span class="col-signal signal-${sig}">${sig}</span>
+          <span>${r.ltp ? r.ltp.toFixed(1) : '—'}</span>
+          <span class="${oc>=0?'oi-up':'oi-down'}">${oc>=0?'▲':'▼'} ${formatNumber(Math.abs(oc))}</span>
+          <span class="${bpCls}">${bp !== null && bp !== undefined ? bp.toFixed(2)+'%' : '—'}</span>
+          <span class="col-alerts">${renderAlerts(r.alerts, r.pattern)}</span>
+        </div>`;
+      });
+      html += `</div></div></div></div>`;
+    });
+  } else {
+    // Fallback: show top gainers / losers from near month
+    html += `
+    <div class="section-title">Top Gainers (Price%)</div>
+    <div class="table-scroll"><div class="table-wrap">
+      <div class="table-header" style="grid-template-columns:100px 70px 80px 80px 1fr;min-width:480px;">
+        <span>Symbol</span><span>Signal</span><span>LTP</span><span>Chg%</span><span>Alerts</span>
       </div>`;
-    }).join('');
+    gainers5.forEach(r => {
+      const chg = pChg(r);
+      html += `<div class="table-row" style="grid-template-columns:100px 70px 80px 80px 1fr;min-width:480px;cursor:pointer;" onclick="showDetail('${r.symbol}')">
+        <span class="col-symbol">${r.symbol}</span>
+        <span class="col-signal signal-${r.signal}">${r.signal}</span>
+        <span>${r.ltp ? r.ltp.toFixed(1) : '—'}</span>
+        <span class="oi-up">▲ ${chg ? chg.toFixed(2)+'%' : '—'}</span>
+        <span class="col-alerts">${renderAlerts(r.alerts, r.pattern)}</span>
+      </div>`;
+    });
+    html += `</div></div>
+    <div class="section-title">Top Losers (Price%)</div>
+    <div class="table-scroll"><div class="table-wrap">
+      <div class="table-header" style="grid-template-columns:100px 70px 80px 80px 1fr;min-width:480px;">
+        <span>Symbol</span><span>Signal</span><span>LTP</span><span>Chg%</span><span>Alerts</span>
+      </div>`;
+    losers5.forEach(r => {
+      const chg = pChg(r);
+      html += `<div class="table-row" style="grid-template-columns:100px 70px 80px 80px 1fr;min-width:480px;cursor:pointer;" onclick="showDetail('${r.symbol}')">
+        <span class="col-symbol">${r.symbol}</span>
+        <span class="col-signal signal-${r.signal}">${r.signal}</span>
+        <span>${r.ltp ? r.ltp.toFixed(1) : '—'}</span>
+        <span class="oi-down">▼ ${chg ? Math.abs(chg).toFixed(2)+'%' : '—'}</span>
+        <span class="col-alerts">${renderAlerts(r.alerts, r.pattern)}</span>
+      </div>`;
+    });
+    html += `</div></div>`;
   }
 
-  document.getElementById('sc-search').addEventListener('input',apply);
-  document.getElementById('sc-strat').addEventListener('change',apply);
-  document.getElementById('sc-sort').addEventListener('change',apply);
-  apply();
+  // Top Alerts
+  html += `<div class="section-title">Top Alerts</div>`;
+  const topAlerts = appData.alerts.slice(0, 10);
+  if (!topAlerts.length) {
+    html += `<div class="empty" style="padding:20px;">No alerts</div>`;
+  } else {
+    topAlerts.forEach(a => {
+      const alertClass = getAlertClass(a.alert);
+      html += `<div class="alert-item" onclick="showDetail('${a.symbol}')" style="cursor:pointer;">
+        <span class="alert-symbol">${a.symbol}</span>
+        <span class="alert-tag ${alertClass}">${a.alert}</span>
+        <span style="color:#666;font-size:11px;">${a.signal}</span>
+      </div>`;
+    });
+  }
+
+  // Ban list inline
+  if (banList.length) {
+    html += `<div class="section-title">F&O Ban (${banList.length})</div><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">`;
+    banList.forEach(item => {
+      html += `<div class="ban-item" onclick="showDetail('${item.symbol}')" style="cursor:pointer;padding:6px 12px;">
+        <span class="ban-badge">🚫</span><span class="ban-symbol">${item.symbol}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Expiry info
+  if (expiries.near || expiries.mid) {
+    html += `<div style="background:#16213e;border:1px solid #2a2a4a;border-radius:8px;padding:10px 14px;font-size:12px;color:#888;margin-bottom:16px;">
+      📅 Near: <span style="color:#4fc3f7;font-weight:600;">${expiries.near||'—'}</span>
+      &nbsp;|&nbsp; Mid: <span style="color:#ffa726;font-weight:600;">${expiries.mid||'—'}</span>
+      &nbsp;|&nbsp; Far: <span style="color:#aaa;font-weight:600;">${expiries.far||'—'}</span>
+    </div>`;
+  }
+
+  el.innerHTML = html;
+  initTableSorting();
 }
 
-function showStratSheet(r) {
-  if(typeof r==='string')try{r=JSON.parse(r);}catch{return;}
-  const bp=parseFloat(r.basis_pct||0), score=parseFloat(r.score||0);
-  const confCl=score>=7?'var(--green)':score>=4?'var(--accent)':'var(--amber)';
-  const bias=(r._bias||'').toLowerCase();
-  const biasCl=bias==='bullish'?'up':bias==='bearish'?'down':'neu';
-  openSheet(`
-    <div class="sheet-row"><span class="lbl">Strategy</span><span class="val bold">${r._emoji||''} ${r._name||r._code||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Direction</span><span class="val ${biasCl} bold">${r._bias||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Score</span><span class="val bold" style="color:${confCl}">${score.toFixed(0)} / 10</span></div>
-    <div class="sheet-row"><span class="lbl">LTP</span><span class="val bold">₹${(r.ltp||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Spot</span><span class="val">₹${(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Basis %</span><span class="val ${bp>=0?'up':'down'}">${bp>=0?'+':''}${bp.toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Conv Score</span><span class="val">${(r.conv_score||0).toFixed(1)}</span></div>
-    <div class="sheet-row"><span class="lbl">Signal</span><span class="val">${sig_badge(r.trend||r.signal)}</span></div>
-    <div class="sheet-row"><span class="lbl">Pattern</span><span class="val">${r.pattern||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">OI Chg%</span><span class="val ${(r.oi_chg_pct||0)>=0?'up':'down'}">${(r.oi_chg_pct||0)>=0?'+':''}${(r.oi_chg_pct||0).toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">OI 5d Chg%</span><span class="val">${(r.oi_5d_pct||0).toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Days to Exp</span><span class="val">${r.days_to_exp||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Lot Size</span><span class="val">${r.lot_size||r.lot||'—'}</span></div>
-    ${r.explanation?`<div class="sheet-row"><span class="lbl">Why</span><span class="val" style="font-style:italic;text-align:right;max-width:200px">${r.explanation}</span></div>`:''}
-  `,(r.ban_status==='ban'?'🚫 ':'')+r.symbol+' — Strategy');
+// ============================================
+// OPTIONS TAB (Screener — Straddle + Covered Call)
+// ============================================
+let optTab = 'straddle';   // straddle | cc
+let optSort = 'roi';       // roi | iv | sym
+
+function setOptTab(t) {
+  optTab = t;
+  renderOptions(document.getElementById('content'));
 }
-window.showStratSheet=showStratSheet; window.renderScanner=renderScanner;
+function setOptSort(s) {
+  optSort = s;
+  document.querySelectorAll('#optSortFilter .filter-pill').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-val') === s));
+  renderOptionsRows();
+}
 
-/* ══════════════════════════════════════════════════════════════════════
-   OPTIONS SCREENER TAB — reads options_screener.straddle[] + covered_call[]
-   ══════════════════════════════════════════════════════════════════════ */
-let _scrTab='straddle';
+function renderOptions(el) {
+  const os = appData.optionsScreener || {};
+  const straddles = os.straddle     || [];
+  const cc        = os.covered_call || [];
+  const mode      = os.data_mode    || 'EOD Bhavcopy';
+  const lrun      = os.last_run     || '—';
+  const osm       = appData.optionsSummary || {};
 
-function renderScreener(data) {
-  const pg=document.getElementById('page-screener'); if(!data||!pg)return;
-  const os   = data.options_screener || {};
-  const strd = os.straddle     || [];
-  const cc   = os.covered_call || [];
-  const mode = os.data_mode    || 'EOD Bhavcopy';
-  const lrun = os.last_run     || '—';
+  // Options summary stats if present
+  const pcr  = parseFloat(osm.pcr  || 0);
+  const avgIV = parseFloat(osm.avg_iv || osm.iv || 0);
 
-  pg.innerHTML=`
-    <div style="display:flex;gap:8px;margin-bottom:8px">
-      <button id="scr-btn-straddle" onclick="scrSwitch('straddle')"
-        style="flex:1;padding:8px;border-radius:6px;border:none;font-weight:700;cursor:pointer;background:var(--accent);color:#fff;font-size:12px">
-        🎯 Short Straddle (${strd.length})
-      </button>
-      <button id="scr-btn-cc" onclick="scrSwitch('cc')"
-        style="flex:1;padding:8px;border-radius:6px;border:none;font-weight:700;cursor:pointer;background:var(--panel);color:var(--fg2);font-size:12px">
-        📈 Covered Call (${cc.length})
-      </button>
-    </div>
-    <div style="font-size:10px;color:var(--fg2);margin-bottom:8px">Mode: ${mode} · Last run: ${lrun}</div>
-
-    <div id="scr-pane-straddle">
-      ${strd.length ? `
-        <div class="filter-bar">
-          <input id="ss-search" type="search" placeholder="Symbol…">
-          <select id="ss-sort">
-            <option value="roi">ROI% ↓</option>
-            <option value="iv">IV ↓</option>
-            <option value="sym">Symbol A–Z</option>
-          </select>
-        </div>
-        <div class="tbl-wrap"><table id="tbl-straddle">
-          <thead><tr><th>Src</th><th>Symbol</th><th>Spot</th><th>Strike</th><th>C+P</th><th>ROI%</th><th>BE Lo</th><th>BE Hi</th><th>IV</th><th>PCR</th></tr></thead>
-          <tbody id="ss-tbody"></tbody>
-        </table></div>` :
-        `<div class="error-state" style="height:160px">
-          <div class="err-icon">🎯</div>
-          <div>No straddle data</div>
-          <div style="font-size:11px;color:var(--fg2);margin-top:6px;max-width:240px;text-align:center">
-            Click <strong>Load Options</strong> in the desktop app, then run the screener and push snapshot
-          </div>
-        </div>`}
-    </div>
-
-    <div id="scr-pane-cc" style="display:none">
-      ${cc.length ? `
-        <div class="filter-bar">
-          <input id="cc-search" type="search" placeholder="Symbol…">
-          <select id="cc-sort">
-            <option value="roi">ROI% ↓</option>
-            <option value="ds">Downside% ↑</option>
-            <option value="sym">Symbol A–Z</option>
-          </select>
-        </div>
-        <div class="tbl-wrap"><table id="tbl-cc">
-          <thead><tr><th>Src</th><th>Symbol</th><th>Spot</th><th>Strike</th><th>CE Prem</th><th>ROI%</th><th>Downside%</th><th>IV</th></tr></thead>
-          <tbody id="cc-tbody"></tbody>
-        </table></div>` :
-        `<div class="error-state" style="height:160px">
-          <div class="err-icon">📈</div>
-          <div>No covered call data</div>
-          <div style="font-size:11px;color:var(--fg2);margin-top:6px;max-width:240px;text-align:center">
-            Run the Options Screener in the desktop app
-          </div>
-        </div>`}
+  let html = `
+    <div class="refresh-bar">
+      <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
+      <span class="source-info">Mode: ${mode} · Last run: ${lrun}</span>
     </div>`;
 
-  // Straddle apply
-  if(strd.length) {
-    function applyStrd() {
-      const q=(document.getElementById('ss-search')?.value||'').trim().toUpperCase();
-      const so=document.getElementById('ss-sort')?.value||'roi';
-      let list=strd.filter(r=>!q||(r.symbol||'').includes(q));
-      list.sort((a,b)=>so==='sym'?(a.symbol||'').localeCompare(b.symbol||''):so==='iv'?(b.iv_atm||b.iv||0)-(a.iv_atm||a.iv||0):(b.max_roi_pct||0)-(a.max_roi_pct||0));
-      const tbody=document.getElementById('ss-tbody'); if(!tbody)return;
-      tbody.innerHTML=list.map(r=>{
-        const roi=parseFloat(r.max_roi_pct||r['Max ROI %']||0);
-        const cp=parseFloat(r.combined||r['C+P']||((r.ce_prem||0)+(r.pe_prem||0)));
-        return`<tr onclick='showStraddleSheet(${JSON.stringify(r)})'>
-          <td style="font-size:10px;color:var(--fg2)">${(r.source||'B')==='live'?'L':'B'}</td>
-          <td><strong>${r.symbol}</strong></td>
-          <td>₹${(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
-          <td>₹${(r.strike||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
-          <td>₹${cp.toFixed(2)}</td>
-          <td class="${roi>2?'up bold':'neu'}">${roi.toFixed(2)}%</td>
-          <td>₹${(r.be_lower||0).toFixed(0)}</td>
-          <td>₹${(r.be_upper||0).toFixed(0)}</td>
-          <td class="${(r.iv_atm||0)>30?'down':(r.iv_atm||0)>20?'neu':'up'}">${(r.iv_atm||0).toFixed(1)}%</td>
-          <td>${(r.pcr||0).toFixed(2)}</td></tr>`;
-      }).join('');
-      makeSortable('tbl-straddle');
-    }
-    document.getElementById('ss-search')?.addEventListener('input',applyStrd);
-    document.getElementById('ss-sort')?.addEventListener('change',applyStrd);
-    applyStrd();
+  // PCR / IV summary if available
+  if (pcr > 0 || avgIV > 0) {
+    const pcrCol = pcr > 1.2 ? '#ef5350' : pcr < 0.8 ? '#66bb6a' : '#888';
+    const pcrLabel = pcr > 1.2 ? 'Bearish' : pcr < 0.8 ? 'Bullish' : 'Neutral';
+    html += `<div style="display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+      <div style="background:#16213e;border:1px solid #2a2a4a;border-radius:8px;padding:10px 18px;text-align:center;min-width:100px;">
+        <div style="font-size:22px;font-weight:700;color:${pcrCol};">${pcr.toFixed(2)}</div>
+        <div style="font-size:11px;color:#888;">PCR (OI)</div>
+        <div style="font-size:11px;color:${pcrCol};font-weight:600;">${pcrLabel}</div>
+      </div>
+      <div style="background:#16213e;border:1px solid #2a2a4a;border-radius:8px;padding:10px 18px;text-align:center;min-width:100px;">
+        <div style="font-size:22px;font-weight:700;color:#f1c40f;">${avgIV > 0 ? avgIV.toFixed(1)+'%' : '—'}</div>
+        <div style="font-size:11px;color:#888;">Avg IV</div>
+      </div>
+      <div style="background:#16213e;border:1px solid #2a2a4a;border-radius:8px;padding:10px 18px;text-align:center;min-width:100px;">
+        <div style="font-size:22px;font-weight:700;color:#4fc3f7;">${straddles.length + cc.length}</div>
+        <div style="font-size:11px;color:#888;">Opportunities</div>
+      </div>
+    </div>`;
   }
 
-  // Covered call apply
-  if(cc.length) {
-    function applyCC() {
-      const q=(document.getElementById('cc-search')?.value||'').trim().toUpperCase();
-      const so=document.getElementById('cc-sort')?.value||'roi';
-      let list=cc.filter(r=>!q||(r.symbol||'').includes(q));
-      list.sort((a,b)=>so==='sym'?(a.symbol||'').localeCompare(b.symbol||''):so==='ds'?(a.downside_pct||0)-(b.downside_pct||0):(b.max_roi_pct||0)-(a.max_roi_pct||0));
-      const tbody=document.getElementById('cc-tbody'); if(!tbody)return;
-      tbody.innerHTML=list.map(r=>{
-        const roi=parseFloat(r.max_roi_pct||0);
-        const ds=parseFloat(r.downside_pct||0);
-        return`<tr onclick='showCCSheet(${JSON.stringify(r)})'>
-          <td style="font-size:10px;color:var(--fg2)">${(r.source||'B')==='live'?'L':'B'}</td>
-          <td><strong>${r.symbol}</strong></td>
-          <td>₹${(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
-          <td>₹${(r.strike||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
-          <td>₹${(r.ce_prem||0).toFixed(2)}</td>
-          <td class="${roi>2?'up bold':'neu'}">${roi.toFixed(2)}%</td>
-          <td class="${ds>5?'up':'neu'}">${ds.toFixed(2)}%</td>
-          <td>${(r.iv_atm||0).toFixed(1)}%</td></tr>`;
-      }).join('');
-      makeSortable('tbl-cc');
-    }
-    document.getElementById('cc-search')?.addEventListener('input',applyCC);
-    document.getElementById('cc-sort')?.addEventListener('change',applyCC);
-    applyCC();
-  }
+  // Tab toggle
+  html += `<div class="oi-tabs">
+    <button class="oi-tab ${optTab==='straddle'?'active':''}" onclick="setOptTab('straddle')">🎯 Short Straddle (${straddles.length})</button>
+    <button class="oi-tab ${optTab==='cc'?'active':''}" onclick="setOptTab('cc')">📈 Covered Call (${cc.length})</button>
+  </div>
 
-  scrSwitch(_scrTab);
+  <!-- Sort pills -->
+  <div class="filter-pills" id="optSortFilter">
+    <span style="font-size:12px;color:#888;margin-right:4px;">Sort:</span>
+    <button class="filter-pill ${optSort==='roi'?'active':''}" data-val="roi" onclick="setOptSort('roi')">ROI% ↓</button>
+    <button class="filter-pill ${optSort==='iv'?'active':''}" data-val="iv" onclick="setOptSort('iv')">IV ↓</button>
+    <button class="filter-pill ${optSort==='sym'?'active':''}" data-val="sym" onclick="setOptSort('sym')">A–Z</button>
+  </div>
+  <div id="optRows"></div>`;
+
+  el.innerHTML = html;
+  renderOptionsRows();
 }
 
-function scrSwitch(tab) {
-  _scrTab=tab;
-  const ps=$('scr-pane-straddle'),pc=$('scr-pane-cc');
-  const bs=$('scr-btn-straddle'),bc=$('scr-btn-cc');
-  if(!ps||!pc)return;
-  if(tab==='straddle'){
-    ps.style.display='block';pc.style.display='none';
-    if(bs){bs.style.background='var(--accent)';bs.style.color='#fff';}
-    if(bc){bc.style.background='var(--panel)';bc.style.color='var(--fg2)';}
+function renderOptionsRows() {
+  const os = appData.optionsScreener || {};
+  const tbody = document.getElementById('optRows');
+  if (!tbody) return;
+
+  if (optTab === 'straddle') {
+    let rows = [...(os.straddle || [])];
+    rows.sort((a,b) => optSort === 'sym' ? (a.symbol||'').localeCompare(b.symbol||'')
+                      : optSort === 'iv'  ? (b.iv_atm||0)-(a.iv_atm||0)
+                      : (b.max_roi_pct||0)-(a.max_roi_pct||0));
+
+    if (!rows.length) {
+      tbody.innerHTML = `<div class="empty">
+        <div style="font-size:40px;margin-bottom:12px;">🎯</div>
+        <p>No straddle data in snapshot</p>
+        <p style="color:#666;margin-top:8px;font-size:12px;">Run the Options Screener in the desktop app,<br>then push snapshot to GitHub.</p>
+      </div>`;
+      return;
+    }
+
+    let html = `<div class="table-scroll"><div class="table-wrap">
+      <div class="table-header" style="grid-template-columns:100px 70px 80px 80px 80px 70px 70px 70px 70px 1fr;min-width:820px;">
+        <span>Symbol</span><span>Expiry</span><span>Spot</span><span>Strike</span>
+        <span>C+P</span><span>ROI%</span><span>BE Lo</span><span>BE Hi</span><span>IV%</span><span>PCR / Source</span>
+      </div>`;
+    rows.forEach(r => {
+      const roi = parseFloat(r.max_roi_pct||0);
+      const roiCol = roi > 2 ? '#66bb6a' : roi > 1 ? '#f1c40f' : '#888';
+      const cp = parseFloat(r.combined || (r.ce_prem||0)+(r.pe_prem||0));
+      const src2 = (r.source||'bhav') === 'live' ? '<span style="color:#66bb6a;font-size:10px;">🟢 Live</span>' : '<span style="color:#888;font-size:10px;">📂 Bhav</span>';
+      html += `<div class="table-row" style="grid-template-columns:100px 70px 80px 80px 80px 70px 70px 70px 70px 1fr;min-width:820px;cursor:pointer;" onclick="showStraddleDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+        <span class="col-symbol">${r.symbol||'—'}</span>
+        <span style="font-size:10px;color:#4fc3f7;">${r.expiry||'—'}</span>
+        <span>₹${parseFloat(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</span>
+        <span>₹${parseFloat(r.strike||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</span>
+        <span style="color:#4fc3f7;font-weight:600;">₹${cp.toFixed(2)}</span>
+        <span style="color:${roiCol};font-weight:700;">${roi.toFixed(2)}%</span>
+        <span style="color:#ef5350;">₹${parseFloat(r.be_lower||0).toFixed(0)}</span>
+        <span style="color:#ef5350;">₹${parseFloat(r.be_upper||0).toFixed(0)}</span>
+        <span style="color:${(r.iv_atm||0)>30?'#ef5350':(r.iv_atm||0)>20?'#f1c40f':'#66bb6a'}">${parseFloat(r.iv_atm||0).toFixed(1)}%</span>
+        <span>${parseFloat(r.pcr||0).toFixed(2)} ${src2}</span>
+      </div>`;
+    });
+    html += `</div></div>`;
+    tbody.innerHTML = html;
+
   } else {
-    ps.style.display='none';pc.style.display='block';
-    if(bc){bc.style.background='var(--accent)';bc.style.color='#fff';}
-    if(bs){bs.style.background='var(--panel)';bs.style.color='var(--fg2)';}
+    let rows = [...(os.covered_call || [])];
+    rows.sort((a,b) => optSort === 'sym' ? (a.symbol||'').localeCompare(b.symbol||'')
+                      : optSort === 'iv'  ? (b.iv_atm||0)-(a.iv_atm||0)
+                      : (b.max_roi_pct||0)-(a.max_roi_pct||0));
+
+    if (!rows.length) {
+      tbody.innerHTML = `<div class="empty">
+        <div style="font-size:40px;margin-bottom:12px;">📈</div>
+        <p>No covered call data in snapshot</p>
+        <p style="color:#666;margin-top:8px;font-size:12px;">Run the Options Screener in the desktop app,<br>then push snapshot to GitHub.</p>
+      </div>`;
+      return;
+    }
+
+    let html = `<div class="table-scroll"><div class="table-wrap">
+      <div class="table-header" style="grid-template-columns:100px 70px 80px 80px 70px 80px 80px 70px 1fr;min-width:760px;">
+        <span>Symbol</span><span>Expiry</span><span>Spot</span><span>Strike</span>
+        <span>CE Prem</span><span>ROI%</span><span>Downside%</span><span>IV%</span><span>Source</span>
+      </div>`;
+    rows.forEach(r => {
+      const roi = parseFloat(r.max_roi_pct||0);
+      const ds  = parseFloat(r.downside_pct||r.safety_pct||0);
+      const roiCol = roi > 2 ? '#66bb6a' : roi > 1 ? '#f1c40f' : '#888';
+      const src2 = (r.source||'bhav') === 'live' ? '<span style="color:#66bb6a;font-size:10px;">🟢 Live</span>' : '<span style="color:#888;font-size:10px;">📂 Bhav</span>';
+      html += `<div class="table-row" style="grid-template-columns:100px 70px 80px 80px 70px 80px 80px 70px 1fr;min-width:760px;cursor:pointer;" onclick="showCCDetail(${JSON.stringify(r).replace(/"/g,'&quot;')})">
+        <span class="col-symbol">${r.symbol||'—'}</span>
+        <span style="font-size:10px;color:#4fc3f7;">${r.expiry||'—'}</span>
+        <span>₹${parseFloat(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</span>
+        <span>₹${parseFloat(r.strike||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</span>
+        <span style="color:#66bb6a;font-weight:600;">₹${parseFloat(r.ce_prem||0).toFixed(2)}</span>
+        <span style="color:${roiCol};font-weight:700;">${roi.toFixed(2)}%</span>
+        <span style="color:#4fc3f7;">${ds.toFixed(2)}%</span>
+        <span style="color:${(r.iv_atm||0)>30?'#ef5350':(r.iv_atm||0)>20?'#f1c40f':'#66bb6a'}">${parseFloat(r.iv_atm||0).toFixed(1)}%</span>
+        <span>${src2}</span>
+      </div>`;
+    });
+    html += `</div></div>`;
+    tbody.innerHTML = html;
   }
+  initTableSorting();
 }
 
-function showStraddleSheet(r) {
-  if(typeof r==='string')try{r=JSON.parse(r);}catch{return;}
-  const roi=parseFloat(r.max_roi_pct||0);
-  const cp=parseFloat(r.combined||((r.ce_prem||0)+(r.pe_prem||0)));
-  openSheet(`
-    <div class="sheet-row"><span class="lbl">Spot</span><span class="val bold">₹${(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">Strike (ATM)</span><span class="val bold">₹${(r.strike||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</span></div>
-    <div class="sheet-row"><span class="lbl">Expiry</span><span class="val">${r.expiry||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">CE Premium</span><span class="val up">₹${(r.ce_prem||0).toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">PE Premium</span><span class="val down">₹${(r.pe_prem||0).toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">Combined (C+P)</span><span class="val bold">₹${cp.toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">Lot Size</span><span class="val">${r.lot_size||r.lot||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Investment</span><span class="val">₹${Math.round(r.investment||0).toLocaleString('en-IN')}</span></div>
-    <div class="sheet-row"><span class="lbl">Max Profit</span><span class="val up bold">₹${Math.round(r.max_profit||0).toLocaleString('en-IN')}</span></div>
-    <div class="sheet-row"><span class="lbl">Max ROI%</span><span class="val up bold">${roi.toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">BE Lower</span><span class="val down">₹${(r.be_lower||0).toFixed(0)}</span></div>
-    <div class="sheet-row"><span class="lbl">BE Upper</span><span class="val down">₹${(r.be_upper||0).toFixed(0)}</span></div>
-    <div class="sheet-row"><span class="lbl">IV ATM</span><span class="val">${(r.iv_atm||0).toFixed(1)}%</span></div>
-    <div class="sheet-row"><span class="lbl">PCR</span><span class="val">${(r.pcr||0).toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">Max Pain</span><span class="val">₹${(r.max_pain||0).toFixed(0)}</span></div>
-    <div class="sheet-row"><span class="lbl">Source</span><span class="val">${r.source==='live'?'🟢 Live NSE':'📂 Bhavcopy'}</span></div>
-  `,r.symbol+' — Short Straddle');
+function showStraddleDetail(r) {
+  if (typeof r === 'string') try { r = JSON.parse(r); } catch { return; }
+  const cp = parseFloat(r.combined || (r.ce_prem||0)+(r.pe_prem||0));
+  document.getElementById('modalSymbol').textContent = (r.symbol||'') + ' — Short Straddle';
+  document.getElementById('modalBody').innerHTML = `
+    <div class="detail-grid">
+      <div class="detail-signal" style="background:#4fc3f720;color:#4fc3f7;">🎯 Short Straddle (Sell CE + PE)</div>
+      <div class="detail-item"><div class="detail-label">Spot Price</div><div class="detail-value">₹${parseFloat(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</div></div>
+      <div class="detail-item"><div class="detail-label">ATM Strike</div><div class="detail-value">₹${parseFloat(r.strike||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>
+      <div class="detail-item"><div class="detail-label">Expiry</div><div class="detail-value" style="font-size:14px;">${r.expiry||'—'}</div></div>
+      <div class="detail-item"><div class="detail-label">CE Premium</div><div class="detail-value" style="color:#66bb6a;">₹${parseFloat(r.ce_prem||0).toFixed(2)}</div></div>
+      <div class="detail-item"><div class="detail-label">PE Premium</div><div class="detail-value" style="color:#ef5350;">₹${parseFloat(r.pe_prem||0).toFixed(2)}</div></div>
+      <div class="detail-item"><div class="detail-label">Combined (C+P)</div><div class="detail-value" style="color:#4fc3f7;">₹${cp.toFixed(2)}</div></div>
+      <div class="detail-item"><div class="detail-label">Lot Size</div><div class="detail-value">${r.lot_size||r.lot||'—'}</div></div>
+      <div class="detail-item"><div class="detail-label">Investment</div><div class="detail-value" style="font-size:14px;">₹${Math.round(r.investment||0).toLocaleString('en-IN')}</div></div>
+      <div class="detail-item"><div class="detail-label">Max Profit</div><div class="detail-value" style="color:#66bb6a;">₹${Math.round(r.max_profit||0).toLocaleString('en-IN')}</div></div>
+      <div class="detail-item"><div class="detail-label">Max ROI %</div><div class="detail-value" style="color:#66bb6a;">${parseFloat(r.max_roi_pct||0).toFixed(2)}%</div></div>
+      <div class="detail-item"><div class="detail-label">BE Lower</div><div class="detail-value" style="color:#ef5350;">₹${parseFloat(r.be_lower||0).toFixed(0)}</div></div>
+      <div class="detail-item"><div class="detail-label">BE Upper</div><div class="detail-value" style="color:#ef5350;">₹${parseFloat(r.be_upper||0).toFixed(0)}</div></div>
+      <div class="detail-item"><div class="detail-label">ATM IV</div><div class="detail-value">${parseFloat(r.iv_atm||0).toFixed(1)}%</div></div>
+      <div class="detail-item"><div class="detail-label">PCR</div><div class="detail-value">${parseFloat(r.pcr||0).toFixed(2)}</div></div>
+      <div class="detail-item"><div class="detail-label">Max Pain</div><div class="detail-value" style="font-size:14px;">₹${parseFloat(r.max_pain||0).toFixed(0)}</div></div>
+      <div class="detail-item"><div class="detail-label">Source</div><div class="detail-value" style="font-size:13px;">${(r.source||'bhav')==='live'?'🟢 Live NSE':'📂 Bhavcopy'}</div></div>
+    </div>`;
+  document.getElementById('detailModal').classList.add('active');
 }
 
-function showCCSheet(r) {
-  if(typeof r==='string')try{r=JSON.parse(r);}catch{return;}
-  const roi=parseFloat(r.max_roi_pct||0), ds=parseFloat(r.downside_pct||0);
-  openSheet(`
-    <div class="sheet-row"><span class="lbl">Spot</span><span class="val bold">₹${(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</span></div>
-    <div class="sheet-row"><span class="lbl">OTM Strike</span><span class="val bold">₹${(r.strike||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</span></div>
-    <div class="sheet-row"><span class="lbl">Expiry</span><span class="val">${r.expiry||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">CE Premium</span><span class="val up">₹${(r.ce_prem||0).toFixed(2)}</span></div>
-    <div class="sheet-row"><span class="lbl">Lot Size</span><span class="val">${r.lot_size||r.lot||'—'}</span></div>
-    <div class="sheet-row"><span class="lbl">Investment</span><span class="val">₹${Math.round(r.investment||0).toLocaleString('en-IN')}</span></div>
-    <div class="sheet-row"><span class="lbl">Max ROI%</span><span class="val up bold">${roi.toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Downside Cover%</span><span class="val up">${ds.toFixed(2)}%</span></div>
-    <div class="sheet-row"><span class="lbl">IV ATM</span><span class="val">${(r.iv_atm||0).toFixed(1)}%</span></div>
-    <div class="sheet-row"><span class="lbl">Source</span><span class="val">${r.source==='live'?'🟢 Live NSE':'📂 Bhavcopy'}</span></div>
-  `,r.symbol+' — Covered Call');
+function showCCDetail(r) {
+  if (typeof r === 'string') try { r = JSON.parse(r); } catch { return; }
+  document.getElementById('modalSymbol').textContent = (r.symbol||'') + ' — Covered Call';
+  document.getElementById('modalBody').innerHTML = `
+    <div class="detail-grid">
+      <div class="detail-signal" style="background:#66bb6a20;color:#66bb6a;">📈 Covered Call (Buy Stock + Sell OTM CE)</div>
+      <div class="detail-item"><div class="detail-label">Spot Price</div><div class="detail-value">₹${parseFloat(r.spot||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</div></div>
+      <div class="detail-item"><div class="detail-label">OTM Strike</div><div class="detail-value">₹${parseFloat(r.strike||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>
+      <div class="detail-item"><div class="detail-label">Expiry</div><div class="detail-value" style="font-size:14px;">${r.expiry||'—'}</div></div>
+      <div class="detail-item"><div class="detail-label">CE Premium</div><div class="detail-value" style="color:#66bb6a;">₹${parseFloat(r.ce_prem||0).toFixed(2)}</div></div>
+      <div class="detail-item"><div class="detail-label">Lot Size</div><div class="detail-value">${r.lot_size||r.lot||'—'}</div></div>
+      <div class="detail-item"><div class="detail-label">Investment</div><div class="detail-value" style="font-size:14px;">₹${Math.round(r.investment||0).toLocaleString('en-IN')}</div></div>
+      <div class="detail-item"><div class="detail-label">Max Profit</div><div class="detail-value" style="color:#66bb6a;">₹${Math.round(r.max_profit||0).toLocaleString('en-IN')}</div></div>
+      <div class="detail-item"><div class="detail-label">Max ROI %</div><div class="detail-value" style="color:#66bb6a;">${parseFloat(r.max_roi_pct||0).toFixed(2)}%</div></div>
+      <div class="detail-item"><div class="detail-label">Downside Cover</div><div class="detail-value" style="color:#4fc3f7;">${parseFloat(r.downside_pct||r.safety_pct||0).toFixed(2)}%</div></div>
+      <div class="detail-item"><div class="detail-label">ATM IV</div><div class="detail-value">${parseFloat(r.iv_atm||0).toFixed(1)}%</div></div>
+      <div class="detail-item"><div class="detail-label">Source</div><div class="detail-value" style="font-size:13px;">${(r.source||'bhav')==='live'?'🟢 Live NSE':'📂 Bhavcopy'}</div></div>
+    </div>`;
+  document.getElementById('detailModal').classList.add('active');
 }
-window.scrSwitch=scrSwitch;
-window.showStraddleSheet=showStraddleSheet; window.showCCSheet=showCCSheet;
-window.renderScreener=renderScreener;
 
-  </script>
+// ============================================
+// INIT
+// ============================================
+loadData();
+// Auto-refresh every 5 minutes
+setInterval(loadData, 300000);
+</script>
 </body>
 </html>
