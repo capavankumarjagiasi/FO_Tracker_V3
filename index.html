@@ -433,7 +433,7 @@ body { font-family:'Segoe UI',system-ui,sans-serif; background:#1a1a2e; color:#e
 const CONFIG = {
   // PRIMARY: GitHub raw URL (RECOMMENDED - same domain, no CORS, no API keys)
   // Replace with your actual raw GitHub URL after pushing JSON to repo
-  githubRawUrl: 'https://raw.githubusercontent.com/capavankumarjagiasi/Fo-Tracker-v2/main/fo_snapshot.json',
+  githubRawUrl: 'https://raw.githubusercontent.com/capavankumarjagiasi/FO_Tracker_V3/main/fo_snapshot_v3.json',
   
   // FALLBACK: jsonbin.io (if you prefer external hosting)
   // Replace YOUR_BIN_ID with your actual bin ID
@@ -453,7 +453,7 @@ let appData = null;
 let currentTab = 'dashboard';
 let dashboardFilter = 'all';
 
-const CACHE_VERSION = 'v2'; // bump this to bust stale cache
+const CACHE_VERSION = 'v3_fo'; // bump this to bust stale cache
 
 // ============================================
 // DATA LOADING - NO GOOGLE DRIVE / NO OAUTH
@@ -554,11 +554,16 @@ async function loadData() {
 // ============================================
 function processData(raw) {
   // Support both v1.0 (futures_tracker = near only) and v2.0 (has near_month)
-  const nearMonth  = raw.near_month  || raw.futures_tracker || [];
-  const midMonth   = raw.mid_month   || [];
-  const farMonth   = raw.far_month   || [];
-  const allExpiry  = raw.futures_tracker || nearMonth;
-  const rollover   = raw.rollover    || [];
+  // v3: futures[] with expiry_rank; v2: near_month[]; v1: futures_tracker[]
+  const allFutures = raw.futures || [];
+  const nearMonth  = raw.near_month || raw.futures_tracker
+                  || allFutures.filter(r=>(r.expiry_rank||1)===1);
+  const midMonth   = raw.mid_month  || allFutures.filter(r=>r.expiry_rank===2);
+  const farMonth   = raw.far_month  || allFutures.filter(r=>r.expiry_rank===3);
+  const allExpiry  = raw.futures_tracker || allFutures || nearMonth;
+  // v3 rollover = {market_rollover_pct, symbols[]}; v2 = []
+  const rolloverRaw = raw.rollover || {};
+  const rollover    = Array.isArray(rolloverRaw) ? rolloverRaw : (rolloverRaw.symbols||[]);
 
   // tracker = near month for dashboard/OI/basis (backward compat)
   const tracker = nearMonth;
@@ -622,6 +627,8 @@ function processData(raw) {
     farMonth,
     allExpiry,
     rollover,
+    marketRolloverPct: Array.isArray(rolloverRaw) ? null
+                     : (rolloverRaw.market_rollover_pct || null),
     signalCounts,
     signalItems,
     basisCats,
