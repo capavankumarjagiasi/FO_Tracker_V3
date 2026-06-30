@@ -444,7 +444,7 @@ const CONFIG = {
   primarySource: 'github',
   
   // Date for display fallback
-  dateFmt: '05-06-2026'
+  dateFmt: ''
 };
 
 // ============================================
@@ -554,6 +554,11 @@ async function loadData() {
 // DATA PROCESSING
 // ============================================
 function processData(raw) {
+  // v3 meta uses fo_date (DD-MM-YYYY); v2 used date_fmt directly.
+  // Derive a unified date_fmt so all UI displays show the correct date.
+  const rawMeta = raw.meta || {};
+  const derivedDateFmt = rawMeta.date_fmt || rawMeta.fo_date || rawMeta.date || '';
+
   // Support both v1.0 (futures_tracker = near only) and v2.0 (has near_month)
   // v3: futures[] with expiry_rank; v2: near_month[]; v1: futures_tracker[]
   const allFutures = raw.futures || [];
@@ -621,7 +626,7 @@ function processData(raw) {
   const optionsSummary  = raw.options_summary  || {};
 
   return {
-    meta:        raw.meta || {},
+    meta:        {...rawMeta, date_fmt: derivedDateFmt},
     tracker,           // near month — used by dashboard, OI, basis
     nearMonth,
     midMonth,
