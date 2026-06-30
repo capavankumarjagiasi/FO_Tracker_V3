@@ -2433,7 +2433,9 @@ function tpScoreAll() {
     const seen = new Set();
     return arr.filter(r => { if (seen.has(r.sym)) return false; seen.add(r.sym); return true; });
   };
-  return { strd: dedupe(strd), cc: dedupe(cc) };
+  const fut = tpScoreFutures();
+  const {bcs, bps, pcp} = tpScoreSpreads();
+  return { strd: dedupe(strd), cc: dedupe(cc), fut, bcs, bps, pcp };
 }
 
 function tpTrendBadge(t) {
@@ -2456,7 +2458,7 @@ function tpScoreBadge(score) {
     font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px">${label}</span>`;
 }
 
-let _tpMode = 'strd';  // 'strd' | 'cc'
+let _tpMode = 'strd';  // 'strd'|'cc'|'fut'|'bcs'|'bps'|'pcp'
 let _tpCache = null;
 
 function tpSwitch(mode) {
@@ -2484,47 +2486,104 @@ function renderTopPicks(el) {
       &nbsp;|&nbsp; Hard filters: OI &lt; 100, Investment &gt; ₹10L, Strong SB trend, Event moves &gt;8%
     </div>
 
-    <div class="oi-tabs" style="margin-bottom:12px">
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px">
+    <div class="oi-tabs" style="min-width:600px;flex-wrap:nowrap">
       <button class="oi-tab tp-tab active" id="tp-btn-strd"
-        onclick="tpSwitch('strd')">🎯 Short Straddle (${ns})</button>
+        onclick="tpSwitch('strd')">🎯 Straddle (${ns})</button>
       <button class="oi-tab tp-tab" id="tp-btn-cc"
         onclick="tpSwitch('cc')">📈 Covered Call (${nc})</button>
-    </div>
+      <button class="oi-tab tp-tab" id="tp-btn-fut"
+        onclick="tpSwitch('fut')">⚡ Futures</button>
+      <button class="oi-tab tp-tab" id="tp-btn-bcs"
+        onclick="tpSwitch('bcs')">🐂 Bull Call Spread</button>
+      <button class="oi-tab tp-tab" id="tp-btn-bps"
+        onclick="tpSwitch('bps')">🐻 Bear Put Spread</button>
+      <button class="oi-tab tp-tab" id="tp-btn-pcp"
+        onclick="tpSwitch('pcp')">⚖️ PCP Arbitrage</button>
+    </div></div>
 
     <div id="tp-rows"></div>`;
 
   tpRenderRows();
 }
 
+const TP_HOW = {
+  strd: `<strong>Short Straddle</strong> — Sell ATM CE + Sell ATM PE on same strike & expiry.
+    Max profit = combined premium collected. Loss starts if price moves beyond either breakeven.
+    <strong>Best when:</strong> IV is high, stock expected to stay range-bound, 7-15 days to expiry.
+    <strong>Exit:</strong> Take 50% profit or exit if stock moves ±2% from strike.`,
+  cc: `<strong>Covered Call</strong> — Already hold stock (or futures) + Sell OTM CE above spot.
+    Premium collected reduces effective buy cost. Max profit capped at strike price.
+    <strong>Best when:</strong> Mildly bullish, high IV, want yield on existing holding.
+    <strong>Exit:</strong> Let expire worthless for full premium, or buy back CE at 20% of sell price.`,
+  fut: `<strong>Futures Momentum</strong> — Buy/Sell futures based on OI + price signal.
+    <strong>LB (Long Buildup):</strong> Fresh longs building → Buy futures. <strong>SC (Short Covering):</strong> Shorts exiting → Buy.
+    <strong>SB (Short Buildup):</strong> Fresh shorts → Sell futures. <strong>LU (Long Unwinding):</strong> Longs exiting → Sell.
+    <strong>Exit:</strong> Stop at 1% below entry for longs, 1% above for shorts. Target 3-5%.`,
+  bcs: `<strong>Bull Call Spread</strong> — Buy lower strike CE + Sell higher strike CE (same expiry).
+    Reduces premium cost vs naked call. Max profit = difference in strikes minus net premium paid.
+    <strong>Best when:</strong> Moderately bullish, index expected to rise 2-5% by expiry.
+    <strong>Exit:</strong> Sell spread when it reaches 80% of max profit, or close if underlying falls below buy strike.`,
+  bps: `<strong>Bear Put Spread</strong> — Buy higher strike PE + Sell lower strike PE (same expiry).
+    Defined risk/reward. Max profit when underlying falls below lower strike.
+    <strong>Best when:</strong> Moderately bearish, index expected to fall 2-5% by expiry.
+    <strong>Exit:</strong> Close when 80% of max profit achieved, or if index rises above buy strike.`,
+  pcp: `<strong>Put-Call Parity Arbitrage</strong> — CE - PE = Futures - Strike × e^(-rT).
+    When this equality breaks down, risk-free profit exists.
+    <strong>CE overpriced:</strong> Sell CE + Buy PE + Sell Futures (synthetic short CE).
+    <strong>PE overpriced:</strong> Buy CE + Sell PE + Buy Futures (synthetic long CE).
+    <strong>Note:</strong> Requires fast execution; slippage can erase edge. Best for index options only.`,
+};
+
 function tpRenderRows() {
   const el = document.getElementById('tp-rows');
   if (!el || !_tpCache) return;
-  const data = _tpMode === 'strd' ? _tpCache.strd : _tpCache.cc;
+
+  const modeMap = {
+    strd:'strd', cc:'cc', fut:'fut', bcs:'bcs', bps:'bps', pcp:'pcp'
+  };
+  const data = _tpCache[modeMap[_tpMode]] || [];
+
+  // Strategy guide banner
+  const how = TP_HOW[_tpMode] || '';
+  let html = `<div style="background:#0d2a1a;border:1px solid #1a4a2a;border-radius:8px;
+    padding:10px 14px;margin-bottom:12px;font-size:12px;color:#a8d8a8;line-height:1.6">
+    📖 <strong>How to trade:</strong> ${how}</div>`;
 
   if (!data.length) {
-    el.innerHTML = `<div class="empty">
+    el.innerHTML = html + `<div class="empty">
       <div style="font-size:36px;margin-bottom:8px">🏆</div>
       <p>No qualifying trades found</p>
       <p style="color:#666;font-size:12px;margin-top:6px">
-        Run the Options Screener and push snapshot first</p></div>`;
+        ${_tpMode==='bcs'||_tpMode==='bps'||_tpMode==='pcp'
+          ? 'Index option chains needed — ensure NIFTY/BANKNIFTY options are loaded'
+          : 'Run the Options Screener and push snapshot first'}</p></div>`;
     return;
   }
 
   const top5   = data.slice(0, 5);
   const next20 = data.slice(5, 25);
 
-  let html = `<div class="section-title" style="color:#f1c40f">
-    🏆 TOP 5 — High Conviction Trades</div>`;
+  html += `<div class="section-title" style="color:#f1c40f">
+    🏆 TOP 5 — High Conviction</div>`;
 
   top5.forEach((r, i) => {
-    html += _tpMode === 'strd' ? tpCardStrd(r, i+1, true) : tpCardCC(r, i+1, true);
+    if (_tpMode==='strd')     html += tpCardStrd(r, i+1, true);
+    else if (_tpMode==='cc')  html += tpCardCC(r, i+1, true);
+    else if (_tpMode==='fut') html += tpCardFut(r, i+1, true);
+    else if (_tpMode==='bcs') html += tpCardSpread(r, i+1, true, 'bcs');
+    else if (_tpMode==='bps') html += tpCardSpread(r, i+1, true, 'bps');
+    else if (_tpMode==='pcp') html += tpCardPCP(r, i+1, true);
   });
 
   if (next20.length) {
     html += `<div class="section-title" style="margin-top:16px;color:#4fc3f7">
-      📋 NEXT ${next20.length} — Watchlist Trades</div>`;
-    // Compact table for next 20
-    html += _tpMode === 'strd' ? tpTableStrd(next20) : tpTableCC(next20);
+      📋 NEXT ${next20.length} — Watchlist</div>`;
+    if (_tpMode==='strd')     html += tpTableStrd(next20);
+    else if (_tpMode==='cc')  html += tpTableCC(next20);
+    else if (_tpMode==='fut') html += tpTableFut(next20);
+    else if (_tpMode==='bcs'||_tpMode==='bps') html += tpTableSpread(next20, _tpMode);
+    else if (_tpMode==='pcp') html += tpTablePCP(next20);
   }
 
   el.innerHTML = html;
@@ -2564,6 +2623,7 @@ function tpCardStrd(r, rank, featured) {
       </div>
     </div>
     <div style="font-size:11px;color:#888;display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <span>Spot <strong style="color:#4fc3f7">₹${r.spot.toLocaleString('en-IN',{maximumFractionDigits:1})}</strong></span>
       <span>Strike <strong style="color:#e0e8f0">₹${r.strike}</strong></span>
       <span>C+P <strong style="color:#22c55e">₹${r.combined.toFixed(2)}</strong></span>
       <span>Lot <strong style="color:#e0e8f0">${r.lotSize}</strong></span>
@@ -2774,6 +2834,531 @@ function tpShowDetail(rJson, mode) {
       </div>`;
   }
   el.classList.add('active');
+}
+
+
+// ============================================================
+// FUTURES TOP PICKS SCORER
+// Scores: Trend signal + OI momentum + Basis + Strength + Liquidity
+// ============================================================
+function tpScoreFutures() {
+  const rows = (appData.tracker || appData.allExpiry || [])
+    .filter(r => (r.EXPIRY_RANK||r.expiry_rank||1) === 1);
+  const scored = [];
+
+  rows.forEach(r => {
+    const sym     = r.SYMBOL     || r.symbol     || '';
+    const trend   = (r.SIGNAL||r.signal||r.TREND||r.trend||'').toUpperCase();
+    const ltp     = parseFloat(r.LTP||r.ltp||0);
+    const spot    = parseFloat(r.SPOT||r.spot||0);
+    const oi      = parseInt(r.OPEN_INT||r.oi||0);
+    const oiChgP  = parseFloat(r.OI_CHG_PCT||r.oi_chg_pct||0);
+    const oiChgP5d= parseFloat(r.oi_5d_chg_pct||0);
+    const chgP    = parseFloat(r.CHG_PCT||r.chg_pct||0);
+    const chgP5d  = parseFloat(r.price_5d_chg_pct||0);
+    const basisP  = parseFloat(r.BASIS_PCT||r.basis_pct||0);
+    const strength= parseFloat(r.STRENGTH||r.strength||0);
+    const conv    = parseFloat(r.CONV_SCORE||r.conv_score||0);
+    const lot     = parseInt(r.LOT||r.lot||r.lot_size||1);
+    const sector  = r.SECTOR||r.sector||'';
+    const pattern = r.PATTERN||r.pattern||'';
+    const alerts  = r.ALERTS||r.alerts||'';
+    const banStatus = (r.BAN_STATUS||r.ban_status||'normal');
+    const dte     = parseInt(r.DAYS_TO_EXP||r.days_to_exp||99);
+
+    if (banStatus === 'ban' || banStatus === 'banned') return;
+    if (!trend || trend === '') return;
+    if (oi < 500) return;          // illiquid
+
+    // Direction: LB/SC = bullish; SB/LU = bearish
+    const isBull = trend==='LB'||trend==='SC';
+    const isBear = trend==='SB'||trend==='LU';
+
+    // 1. Signal quality (0-25)
+    const sigScore = {LB:25, SC:18, SB:25, LU:18}[trend] || 0;
+
+    // 2. OI momentum (0-20): 1-day + 5-day alignment
+    let oiMom = 0;
+    if (isBull && oiChgP > 0) oiMom += Math.min(10, oiChgP);
+    if (isBull && oiChgP5d > 0) oiMom += Math.min(10, oiChgP5d/2);
+    if (isBear && oiChgP > 0) oiMom += Math.min(10, oiChgP);  // SB: OI rising = bear
+    if (isBear && oiChgP5d > 0) oiMom += Math.min(10, oiChgP5d/2);
+    oiMom = Math.min(20, oiMom);
+
+    // 3. Price momentum (0-20): 1d + 5d aligned with direction
+    let priceMom = 0;
+    if (isBull) {
+      if (chgP > 0) priceMom += Math.min(10, chgP * 2);
+      if (chgP5d > 0) priceMom += Math.min(10, chgP5d);
+    } else {
+      if (chgP < 0) priceMom += Math.min(10, Math.abs(chgP) * 2);
+      if (chgP5d < 0) priceMom += Math.min(10, Math.abs(chgP5d));
+    }
+    priceMom = Math.min(20, priceMom);
+
+    // 4. Basis alignment (0-15): LB with premium=bullish; SB with premium=bearish
+    let basisScore = 0;
+    if (isBull && basisP > 0 && basisP < 1.5) basisScore = 15;
+    else if (isBull && basisP > 0) basisScore = 10;
+    else if (isBull && basisP >= -0.5) basisScore = 8;
+    else if (isBear && basisP < 0) basisScore = 15;
+    else if (isBear && basisP < 0.5) basisScore = 10;
+    else basisScore = 5;
+
+    // 5. Liquidity (0-10): higher OI = easier to exit
+    const liqScore = Math.min(10, Math.log10(Math.max(oi,1)) / Math.log10(50000) * 10);
+
+    // 6. Strength (0-10): internal strength rating
+    const strScore = Math.min(10, strength);
+
+    const total = sigScore + oiMom + priceMom + basisScore + liqScore + strScore;
+
+    scored.push({
+      sym, trend, ltp, spot, lot, oi, oiChgP, oiChgP5d,
+      chgP, chgP5d, basisP, strength, conv, sector, pattern, alerts, dte,
+      inv: ltp * lot,
+      direction: isBull ? 'BUY' : 'SELL',
+      score: +total.toFixed(1),
+      sSig: +sigScore.toFixed(1), sOiM: +oiMom.toFixed(1),
+      sPrM: +priceMom.toFixed(1), sBas: +basisScore.toFixed(1),
+      sLiq: +liqScore.toFixed(1), sStr: +strScore.toFixed(1),
+      why: tpWhyFut(trend, chgP, oiChgP, basisP, sector),
+    });
+  });
+
+  scored.sort((a,b) => b.score - a.score);
+  // Dedupe by symbol
+  const seen = new Set();
+  return scored.filter(r => { if(seen.has(r.sym)) return false; seen.add(r.sym); return true; });
+}
+
+function tpWhyFut(trend, chg, oiChg, basis, sector) {
+  const parts = [];
+  if (trend==='LB') parts.push('fresh longs building');
+  else if (trend==='SC') parts.push('short squeeze underway');
+  else if (trend==='SB') parts.push('fresh shorts building');
+  else if (trend==='LU') parts.push('longs unwinding');
+  if (Math.abs(chg) > 1) parts.push(`${chg>0?'+':''}${chg.toFixed(1)}% today`);
+  if (Math.abs(oiChg) > 5) parts.push(`OI ${oiChg>0?'+':''}${oiChg.toFixed(0)}%`);
+  if (Math.abs(basis) > 0.2) parts.push(`basis ${basis>0?'+':''}${basis.toFixed(2)}%`);
+  if (sector) parts.push(sector);
+  return parts.join(' · ') || 'Momentum trade';
+}
+
+function tpCardFut(r, rank, featured) {
+  const isBull = r.direction === 'BUY';
+  const col = isBull ? '#22c55e' : '#ef4444';
+  const rankEmoji = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`;
+  return `
+  <div class="card" style="margin-bottom:10px;border-color:${col}44;
+      ${featured?'border-left:3px solid '+col:''}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+      <div>
+        <span style="font-size:16px;margin-right:6px">${rankEmoji}</span>
+        <strong style="font-size:15px;color:#e0e8f0">${r.sym}</strong>
+        <span style="font-size:11px;color:#888;margin-left:6px">${r.sector}</span>
+      </div>
+      <div style="text-align:right">
+        <span style="background:${col}22;color:${col};border:1px solid ${col}44;
+          font-size:12px;font-weight:700;padding:3px 10px;border-radius:5px">
+          ${isBull?'▲ BUY':'▼ SELL'} FUTURES</span>
+        <div style="font-size:18px;font-weight:700;color:${col};margin-top:4px">${r.score}/100</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">
+      <div style="background:#16213e;border-radius:6px;padding:7px;text-align:center">
+        <div style="font-size:13px;font-weight:700;color:#4fc3f7">₹${r.spot?.toLocaleString('en-IN',{maximumFractionDigits:1})}</div>
+        <div style="font-size:10px;color:#888">Spot</div>
+      </div>
+      <div style="background:#16213e;border-radius:6px;padding:7px;text-align:center">
+        <div style="font-size:13px;font-weight:700;color:#e0e8f0">₹${r.ltp?.toLocaleString('en-IN',{maximumFractionDigits:1})}</div>
+        <div style="font-size:10px;color:#888">Futures LTP</div>
+      </div>
+      <div style="background:#16213e;border-radius:6px;padding:7px;text-align:center">
+        <div style="font-size:14px;font-weight:700;color:${r.chgP>=0?'#22c55e':'#ef4444'}">${r.chgP>=0?'+':''}${r.chgP?.toFixed(2)}%</div>
+        <div style="font-size:10px;color:#888">Price Chg</div>
+      </div>
+      <div style="background:#16213e;border-radius:6px;padding:7px;text-align:center">
+        <div style="font-size:14px;font-weight:700;color:${r.oiChgP>=0?'#22c55e':'#ef4444'}">${r.oiChgP>=0?'+':''}${r.oiChgP?.toFixed(1)}%</div>
+        <div style="font-size:10px;color:#888">OI Chg</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#888;display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      ${tpTrendBadge(r.trend)}
+      <span>OI <strong style="color:#e0e8f0">${r.oi>=1000?(r.oi/1000).toFixed(1)+'K':r.oi}</strong></span>
+      <span>Basis <strong style="color:${r.basisP>=0?'#22c55e':'#ef4444'}">${r.basisP>=0?'+':''}${r.basisP?.toFixed(2)}%</strong></span>
+      <span>5d <strong style="color:${r.chgP5d>=0?'#22c55e':'#ef4444'}">${r.chgP5d>=0?'+':''}${r.chgP5d?.toFixed(1)}%</strong></span>
+      <span>Lot <strong style="color:#e0e8f0">${r.lot}</strong></span>
+      <span>DTE <strong style="color:#f59e0b">${r.dte}d</strong></span>
+    </div>
+    ${r.pattern?`<div style="font-size:11px;color:#888;margin-bottom:6px">Pattern: <span style="color:#4fc3f7">${r.pattern}</span></div>`:''}
+    <div style="font-size:10px;color:#666;margin-bottom:4px">Score breakdown (${r.score}/100):</div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:3px">
+      ${[['Signal',r.sSig,25,col],['OI Mom',r.sOiM,20,'#4fc3f7'],
+         ['Price',r.sPrM,20,'#f1c40f'],['Basis',r.sBas,15,'#a855f7'],
+         ['Liq',r.sLiq,10,'#f59e0b'],['Str',r.sStr,10,'#22c55e']].map(([l,v,m,c])=>`
+        <div style="text-align:center">
+          <div style="font-size:9px;color:#666">${l}</div>
+          <div style="font-size:11px;font-weight:700;color:${c}">${typeof v==='number'?v.toFixed(0):v}</div>
+          ${tpBar(v,m,c)}
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:#7bc47b;font-style:italic">💡 ${r.why}</div>
+  </div>`;
+}
+
+function tpTableFut(rows) {
+  return `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+  <thead><tr style="background:#1a2a3a;color:#888">
+    <th style="padding:6px 8px">#</th><th style="padding:6px 8px;text-align:left">Symbol</th>
+    <th style="padding:6px 8px">Dir</th><th style="padding:6px 8px">Score</th>
+    <th style="padding:6px 8px">Spot</th><th style="padding:6px 8px">Chg%</th>
+    <th style="padding:6px 8px">OI Chg%</th><th style="padding:6px 8px">Basis%</th>
+    <th style="padding:6px 8px">Trend</th><th style="padding:6px 8px;text-align:left">Why</th>
+  </tr></thead><tbody>
+  ${rows.map((r,i)=>`<tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:6px 8px;color:#888">${i+6}</td>
+    <td style="padding:6px 8px"><strong style="color:#e0e8f0">${r.sym}</strong>
+      <div style="font-size:10px;color:#888">${r.sector}</div></td>
+    <td style="padding:6px 8px;text-align:center;font-weight:700;
+      color:${r.direction==='BUY'?'#22c55e':'#ef4444'}">${r.direction==='BUY'?'▲ BUY':'▼ SELL'}</td>
+    <td style="padding:6px 8px;text-align:center;font-weight:700;color:#4fc3f7">${r.score}</td>
+    <td style="padding:6px 8px;text-align:center">₹${r.spot?.toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+    <td style="padding:6px 8px;text-align:center;color:${r.chgP>=0?'#22c55e':'#ef4444'}">${r.chgP>=0?'+':''}${r.chgP?.toFixed(2)}%</td>
+    <td style="padding:6px 8px;text-align:center;color:${r.oiChgP>=0?'#22c55e':'#ef4444'}">${r.oiChgP>=0?'+':''}${r.oiChgP?.toFixed(1)}%</td>
+    <td style="padding:6px 8px;text-align:center;color:${r.basisP>=0?'#22c55e':'#ef4444'}">${r.basisP>=0?'+':''}${r.basisP?.toFixed(2)}%</td>
+    <td style="padding:6px 8px;text-align:center">${tpTrendBadge(r.trend)}</td>
+    <td style="padding:6px 8px;font-size:10px;color:#7bc47b">${r.why.split('·')[0]}</td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+
+// ============================================================
+// BULL CALL SPREAD + BEAR PUT SPREAD + PUT-CALL PARITY
+// Uses index option chains from options_summary.indices{}
+// ============================================================
+function tpScoreSpreads() {
+  const indices = (appData.optionsSummary||{}).indices || {};
+  const rate = 0.09;
+  const bcs = [], bps = [], pcp = [];
+
+  Object.entries(indices).forEach(([idxName, idx]) => {
+    const chain = idx.chain || [];
+    if (chain.length < 3) return;
+    const spot   = parseFloat(idx.spot || 0);
+    const expiry = idx.expiry || '';
+    const pcr    = parseFloat(idx.pcr_oi || 0);
+    const ivAtm  = parseFloat(idx.iv_atm || 0);
+    // days to expiry from expiry string DD-MMM-YYYY
+    const dte = (()=>{
+      try {
+        const [d,m,y] = expiry.split('-');
+        const months = {JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,
+          JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11};
+        const exp = new Date(+y, months[m], +d);
+        return Math.max(1, Math.round((exp - new Date()) / 86400000));
+      } catch { return 10; }
+    })();
+
+    // Sort chain by strike ascending
+    const sortedChain = [...chain].sort((a,b)=>a.strike-b.strike);
+    let atmIdx = sortedChain.findIndex(r=>r.is_atm);
+    if (atmIdx === -1) atmIdx = sortedChain.findIndex(r=>r.strike >= spot);
+    if (atmIdx === -1) atmIdx = Math.floor(sortedChain.length/2);
+
+    // ── BULL CALL SPREAD ────────────────────────────────────────────────────
+    // Buy CE at ATM (or 1 below), Sell CE at 1-2 strikes above
+    for (let bi = Math.max(0, atmIdx-1); bi <= Math.min(atmIdx+1, sortedChain.length-3); bi++) {
+      for (let si = bi+1; si <= Math.min(bi+3, sortedChain.length-1); si++) {
+        const buyRow  = sortedChain[bi];
+        const sellRow = sortedChain[si];
+        if (!buyRow?.ce_ltp || !sellRow?.ce_ltp) continue;
+        const netPremium  = buyRow.ce_ltp - sellRow.ce_ltp;
+        const spreadWidth = sellRow.strike - buyRow.strike;
+        if (netPremium <= 0 || spreadWidth <= 0) continue;
+        const maxProfit  = spreadWidth - netPremium;
+        const maxRoi     = netPremium > 0 ? maxProfit / netPremium * 100 : 0;
+        const be         = buyRow.strike + netPremium;
+        const riskReward = maxProfit / netPremium;
+        // Distance of BE from spot
+        const beGap = (be - spot) / spot * 100;
+        // Quality: needs moderate beGap (1-4%), good R:R (>1.5), OI on sell strike
+        const sRR   = Math.min(30, riskReward * 10);
+        const sBE   = Math.max(0, 25 - Math.abs(beGap - 2) * 5);
+        const sLiq  = Math.min(25, Math.log10(Math.max(sellRow.ce_oi||1,1)) / Math.log10(20000) * 25);
+        const sPCR  = pcr < 0.8 ? 20 : pcr < 1.2 ? 15 : 5;  // bullish PCR better for BCS
+        const total = sRR + sBE + sLiq + sPCR;
+        bcs.push({
+          sym: idxName, expiry, spot, dte, pcr, ivAtm,
+          buyStrike: buyRow.strike, sellStrike: sellRow.strike,
+          buyCE: buyRow.ce_ltp, sellCE: sellRow.ce_ltp,
+          netPremium: +netPremium.toFixed(2),
+          spreadWidth, maxProfit: +maxProfit.toFixed(2),
+          maxRoi: +maxRoi.toFixed(1), be: +be.toFixed(0),
+          beGap: +beGap.toFixed(1), rr: +riskReward.toFixed(2),
+          buyOI: buyRow.ce_oi||0, sellOI: sellRow.ce_oi||0,
+          score: +total.toFixed(1),
+          sRR:+sRR.toFixed(1), sBE:+sBE.toFixed(1), sLiq:+sLiq.toFixed(1), sPCR:+sPCR.toFixed(1),
+          why: `R:R ${riskReward.toFixed(1)}x · BE ₹${be.toFixed(0)} (${beGap>0?'+':''}${beGap.toFixed(1)}% from spot) · PCR ${pcr.toFixed(2)}`,
+        });
+      }
+    }
+
+    // ── BEAR PUT SPREAD ─────────────────────────────────────────────────────
+    for (let bi = Math.max(0, atmIdx); bi <= Math.min(atmIdx+2, sortedChain.length-1); bi++) {
+      for (let si = Math.max(0, bi-3); si < bi; si++) {
+        const buyRow  = sortedChain[bi];   // buy higher PE
+        const sellRow = sortedChain[si];   // sell lower PE
+        if (!buyRow?.pe_ltp || !sellRow?.pe_ltp) continue;
+        const netPremium  = buyRow.pe_ltp - sellRow.pe_ltp;
+        const spreadWidth = buyRow.strike - sellRow.strike;
+        if (netPremium <= 0 || spreadWidth <= 0) continue;
+        const maxProfit  = spreadWidth - netPremium;
+        const maxRoi     = maxProfit / netPremium * 100;
+        const be         = buyRow.strike - netPremium;
+        const beGap      = (spot - be) / spot * 100;   // how much spot needs to fall
+        const riskReward = maxProfit / netPremium;
+        const sRR  = Math.min(30, riskReward * 10);
+        const sBE  = Math.max(0, 25 - Math.abs(beGap - 2) * 5);
+        const sLiq = Math.min(25, Math.log10(Math.max(sellRow.pe_oi||1,1)) / Math.log10(20000) * 25);
+        const sPCR = pcr > 1.2 ? 20 : pcr > 0.8 ? 15 : 5;  // bearish PCR better for BPS
+        const total = sRR + sBE + sLiq + sPCR;
+        bps.push({
+          sym: idxName, expiry, spot, dte, pcr, ivAtm,
+          buyStrike: buyRow.strike, sellStrike: sellRow.strike,
+          buyPE: buyRow.pe_ltp, sellPE: sellRow.pe_ltp,
+          netPremium: +netPremium.toFixed(2),
+          spreadWidth, maxProfit: +maxProfit.toFixed(2),
+          maxRoi: +maxRoi.toFixed(1), be: +be.toFixed(0),
+          beGap: +beGap.toFixed(1), rr: +riskReward.toFixed(2),
+          buyOI: buyRow.pe_oi||0, sellOI: sellRow.pe_oi||0,
+          score: +total.toFixed(1),
+          sRR:+sRR.toFixed(1), sBE:+sBE.toFixed(1), sLiq:+sLiq.toFixed(1), sPCR:+sPCR.toFixed(1),
+          why: `R:R ${riskReward.toFixed(1)}x · BE ₹${be.toFixed(0)} (${beGap.toFixed(1)}% drop needed) · PCR ${pcr.toFixed(2)}`,
+        });
+      }
+    }
+
+    // ── PUT-CALL PARITY ARBITRAGE ────────────────────────────────────────────
+    // C - P = F - K×e^(-rT) where F ≈ spot (use futures price if available)
+    const T = dte / 365;
+    sortedChain.forEach(row => {
+      if (!row.ce_ltp || !row.pe_ltp) return;
+      const K     = row.strike;
+      const C     = row.ce_ltp;
+      const P     = row.pe_ltp;
+      const pv_K  = K * Math.exp(-rate * T);
+      const theoretical = spot - pv_K;    // C - P should equal this
+      const actual      = C - P;
+      const mispricing  = actual - theoretical;
+      const mispricingPct = Math.abs(mispricing) / spot * 100;
+
+      if (mispricingPct < 0.15) return;   // too small to trade after costs
+
+      const action = mispricing > 0
+        ? 'Sell CE + Buy PE + Sell Futures'   // CE overpriced
+        : 'Buy CE + Sell PE + Buy Futures';   // PE overpriced
+
+      // Score: bigger mispricing = better, but need OI on both sides
+      const sGap  = Math.min(40, mispricingPct * 20);
+      const sLiqC = Math.min(30, Math.log10(Math.max(row.ce_oi||1,1)) / Math.log10(20000) * 30);
+      const sLiqP = Math.min(30, Math.log10(Math.max(row.pe_oi||1,1)) / Math.log10(20000) * 30);
+      const total = sGap + (sLiqC + sLiqP) / 2;
+
+      pcp.push({
+        sym: idxName, expiry, spot, dte, K,
+        C, P, theoretical: +theoretical.toFixed(2),
+        actual: +actual.toFixed(2), mispricing: +mispricing.toFixed(2),
+        mispricingPct: +mispricingPct.toFixed(3),
+        action, ceOI: row.ce_oi||0, peOI: row.pe_oi||0,
+        score: +total.toFixed(1),
+        sGap:+sGap.toFixed(1), sLiq:+((sLiqC+sLiqP)/2).toFixed(1),
+        why: `${mispricing>0?'CE overpriced':'PE overpriced'} by ₹${Math.abs(mispricing).toFixed(2)} (${mispricingPct.toFixed(2)}%)`,
+      });
+    });
+  });
+
+  bcs.sort((a,b)=>b.score-a.score);
+  bps.sort((a,b)=>b.score-a.score);
+  pcp.sort((a,b)=>b.score-a.score);
+  return { bcs, bps, pcp };
+}
+
+// ── Spread card ─────────────────────────────────────────────────────────────
+function tpCardSpread(r, rank, featured, mode) {
+  const isBull = mode === 'bcs';
+  const col = isBull ? '#22c55e' : '#ef4444';
+  const rankEmoji = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`;
+  const buyLabel  = isBull ? 'Buy CE' : 'Buy PE';
+  const sellLabel = isBull ? 'Sell CE' : 'Sell PE';
+  const buyPrem   = isBull ? r.buyCE : r.buyPE;
+  const sellPrem  = isBull ? r.sellCE : r.sellPE;
+  return `
+  <div class="card" style="margin-bottom:10px;border-color:${col}44;
+      ${featured?'border-left:3px solid '+col:''}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+      <div>
+        <span style="font-size:16px;margin-right:6px">${rankEmoji}</span>
+        <strong style="font-size:15px;color:#e0e8f0">${r.sym}</strong>
+        <span style="font-size:11px;color:#4fc3f7;margin-left:8px">${r.expiry}</span>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:18px;font-weight:700;color:${col}">${r.score}/100</div>
+        <div style="font-size:11px;color:#888">${r.dte}d to expiry</div>
+      </div>
+    </div>
+    <!-- Spread visual -->
+    <div style="background:#16213e;border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px">
+        <div style="text-align:center">
+          <div style="color:#22c55e;font-weight:700">${buyLabel}</div>
+          <div style="font-size:16px;color:#e0e8f0;font-weight:700">₹${r.buyStrike}</div>
+          <div style="color:#22c55e">@ ₹${buyPrem?.toFixed(2)}</div>
+        </div>
+        <div style="text-align:center;color:#888">
+          <div>──── Width: ₹${r.spreadWidth} ────</div>
+          <div style="font-size:10px;margin-top:4px">Net cost: ₹${r.netPremium}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="color:#ef5350;font-weight:700">${sellLabel}</div>
+          <div style="font-size:16px;color:#e0e8f0;font-weight:700">₹${r.sellStrike}</div>
+          <div style="color:#ef5350">@ ₹${sellPrem?.toFixed(2)}</div>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">
+      <div style="background:#16213e;border-radius:6px;padding:7px;text-align:center">
+        <div style="font-size:13px;font-weight:700;color:${col}">${r.maxRoi?.toFixed(1)}%</div>
+        <div style="font-size:10px;color:#888">Max ROI</div>
+      </div>
+      <div style="background:#16213e;border-radius:6px;padding:7px;text-align:center">
+        <div style="font-size:13px;font-weight:700;color:#f1c40f">${r.rr}x</div>
+        <div style="font-size:10px;color:#888">Risk:Reward</div>
+      </div>
+      <div style="background:#16213e;border-radius:6px;padding:7px;text-align:center">
+        <div style="font-size:13px;font-weight:700;color:#4fc3f7">₹${r.be}</div>
+        <div style="font-size:10px;color:#888">Breakeven</div>
+      </div>
+      <div style="background:#16213e;border-radius:6px;padding:7px;text-align:center">
+        <div style="font-size:13px;font-weight:700;color:#e0e8f0">₹${r.spot?.toLocaleString('en-IN',{maximumFractionDigits:0})}</div>
+        <div style="font-size:10px;color:#888">Spot</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#888;display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <span>Max Profit <strong style="color:#22c55e">₹${r.maxProfit}</strong></span>
+      <span>PCR <strong style="color:#e0e8f0">${r.pcr?.toFixed(2)}</strong></span>
+      <span>IV ATM <strong style="color:#f59e0b">${r.ivAtm?.toFixed(1)}%</strong></span>
+      <span>Sell OI <strong style="color:#e0e8f0">${r.sellOI?.toLocaleString()}</strong></span>
+    </div>
+    <div style="font-size:10px;color:#666;margin-bottom:4px">Score breakdown:</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">
+      ${[['R:R',r.sRR,30,col],['BE Gap',r.sBE,25,'#4fc3f7'],
+         ['Liquidity',r.sLiq,25,'#f1c40f'],['PCR',r.sPCR,20,'#a855f7']].map(([l,v,m,c])=>`
+        <div style="text-align:center">
+          <div style="font-size:10px;color:#666">${l}</div>
+          <div style="font-size:11px;font-weight:700;color:${c}">${v?.toFixed(0)}</div>
+          ${tpBar(v,m,c)}
+        </div>`).join('')}
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:#7bc47b;font-style:italic">💡 ${r.why}</div>
+  </div>`;
+}
+
+function tpTableSpread(rows, mode) {
+  const isBull = mode==='bcs';
+  return `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+  <thead><tr style="background:#1a2a3a;color:#888">
+    <th style="padding:6px 8px">#</th><th style="padding:6px 8px;text-align:left">Index</th>
+    <th style="padding:6px 8px">Score</th><th style="padding:6px 8px">Buy ₹</th>
+    <th style="padding:6px 8px">Sell ₹</th><th style="padding:6px 8px">Net Cost</th>
+    <th style="padding:6px 8px">Max ROI</th><th style="padding:6px 8px">R:R</th>
+    <th style="padding:6px 8px">BE</th><th style="padding:6px 8px">Spot</th>
+  </tr></thead><tbody>
+  ${rows.map((r,i)=>`<tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:6px 8px;color:#888">${i+6}</td>
+    <td style="padding:6px 8px"><strong style="color:#e0e8f0">${r.sym}</strong>
+      <div style="font-size:10px;color:#4fc3f7">${r.expiry}</div></td>
+    <td style="padding:6px 8px;text-align:center;font-weight:700;color:#4fc3f7">${r.score}</td>
+    <td style="padding:6px 8px;text-align:center;color:#22c55e">₹${r.buyStrike}</td>
+    <td style="padding:6px 8px;text-align:center;color:#ef5350">₹${r.sellStrike}</td>
+    <td style="padding:6px 8px;text-align:center">₹${r.netPremium}</td>
+    <td style="padding:6px 8px;text-align:center;color:#22c55e">${r.maxRoi}%</td>
+    <td style="padding:6px 8px;text-align:center;color:#f1c40f">${r.rr}x</td>
+    <td style="padding:6px 8px;text-align:center;color:#4fc3f7">₹${r.be}</td>
+    <td style="padding:6px 8px;text-align:center">₹${r.spot?.toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+
+function tpCardPCP(r, rank, featured) {
+  const rankEmoji = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':`#${rank}`;
+  const isOver = r.mispricing > 0;
+  return `
+  <div class="card" style="margin-bottom:10px;border-color:#f1c40f44;
+      ${featured?'border-left:3px solid #f1c40f':''}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+      <div>
+        <span style="font-size:16px;margin-right:6px">${rankEmoji}</span>
+        <strong style="font-size:15px;color:#e0e8f0">${r.sym} ₹${r.K}</strong>
+        <span style="font-size:11px;color:#4fc3f7;margin-left:8px">${r.expiry}</span>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:18px;font-weight:700;color:#f1c40f">${r.score?.toFixed(0)}/100</div>
+        <div style="font-size:10px;color:#888">${r.dte}d to expiry</div>
+      </div>
+    </div>
+    <div style="background:#1a2a0a;border:1px solid #3a4a1a;border-radius:8px;padding:10px;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:700;color:#f1c40f;margin-bottom:6px">
+        ⚖️ ${isOver?'CE OVERPRICED':'PE OVERPRICED'} by ₹${Math.abs(r.mispricing).toFixed(2)} (${r.mispricingPct.toFixed(3)}%)
+      </div>
+      <div style="font-size:12px;color:#a8d8a8">Action: <strong>${r.action}</strong></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px">
+      <div style="background:#16213e;border-radius:6px;padding:7px;text-align:center">
+        <div style="font-size:13px;font-weight:700;color:#4fc3f7">₹${r.spot?.toLocaleString('en-IN',{maximumFractionDigits:0})}</div>
+        <div style="font-size:10px;color:#888">Spot</div>
+      </div>
+      <div style="background:#16213e;border-radius:6px;padding:7px;text-align:center">
+        <div style="font-size:13px;font-weight:700;color:#22c55e">₹${r.C?.toFixed(2)}</div>
+        <div style="font-size:10px;color:#888">CE Price</div>
+      </div>
+      <div style="background:#16213e;border-radius:6px;padding:7px;text-align:center">
+        <div style="font-size:13px;font-weight:700;color:#ef5350">₹${r.P?.toFixed(2)}</div>
+        <div style="font-size:10px;color:#888">PE Price</div>
+      </div>
+      <div style="background:#16213e;border-radius:6px;padding:7px;text-align:center">
+        <div style="font-size:13px;font-weight:700;color:#f1c40f">₹${r.theoretical?.toFixed(2)}</div>
+        <div style="font-size:10px;color:#888">Theoretical C-P</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#888;display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px">
+      <span>Actual C-P <strong style="color:#e0e8f0">₹${r.actual}</strong></span>
+      <span>CE OI <strong style="color:#22c55e">${r.ceOI?.toLocaleString()}</strong></span>
+      <span>PE OI <strong style="color:#ef5350">${r.peOI?.toLocaleString()}</strong></span>
+      <span>DTE <strong style="color:#f59e0b">${r.dte}d</strong></span>
+    </div>
+    <div style="margin-top:8px;font-size:11px;color:#7bc47b;font-style:italic">💡 ${r.why}</div>
+  </div>`;
+}
+
+function tpTablePCP(rows) {
+  return `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+  <thead><tr style="background:#1a2a3a;color:#888">
+    <th style="padding:6px 8px">#</th><th style="padding:6px 8px;text-align:left">Index/Strike</th>
+    <th style="padding:6px 8px">Score</th><th style="padding:6px 8px">Mispricing</th>
+    <th style="padding:6px 8px">CE</th><th style="padding:6px 8px">PE</th>
+    <th style="padding:6px 8px">Theory C-P</th><th style="padding:6px 8px;text-align:left">Action</th>
+  </tr></thead><tbody>
+  ${rows.map((r,i)=>`<tr style="border-bottom:1px solid #1a2a3a">
+    <td style="padding:6px 8px;color:#888">${i+6}</td>
+    <td style="padding:6px 8px"><strong style="color:#e0e8f0">${r.sym} ₹${r.K}</strong>
+      <div style="font-size:10px;color:#4fc3f7">${r.expiry}</div></td>
+    <td style="padding:6px 8px;text-align:center;font-weight:700;color:#f1c40f">${r.score?.toFixed(0)}</td>
+    <td style="padding:6px 8px;text-align:center;color:${r.mispricing>0?'#22c55e':'#ef5350'}">
+      ₹${Math.abs(r.mispricing).toFixed(2)}</td>
+    <td style="padding:6px 8px;text-align:center;color:#22c55e">₹${r.C?.toFixed(2)}</td>
+    <td style="padding:6px 8px;text-align:center;color:#ef5350">₹${r.P?.toFixed(2)}</td>
+    <td style="padding:6px 8px;text-align:center">₹${r.theoretical?.toFixed(2)}</td>
+    <td style="padding:6px 8px;font-size:10px;color:#a8d8a8">${r.action}</td>
+  </tr>`).join('')}</tbody></table></div>`;
 }
 
 // ============================================
