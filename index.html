@@ -571,6 +571,53 @@ function processData(raw) {
   const rolloverRaw = raw.rollover || {};
   const rollover    = Array.isArray(rolloverRaw) ? rolloverRaw : (rolloverRaw.symbols||[]);
 
+  // ── v3 field normalisation ────────────────────────────────────────────────
+  // v3 futures rows use `trend` (LB/SB/LU/SC) instead of v2's `signal`.
+  // Normalise every row here ONCE so all downstream code (signalCounts,
+  // OI Movers, Basis, Dashboard alerts etc.) keeps working unchanged —
+  // they all read item.signal.
+  function tpNormaliseFutRow(r) {
+    if (r.signal      == null && r.trend          != null) r.signal      = r.trend;
+    if (r.oi_5d_pct    == null && r.oi_5d_chg_pct  != null) r.oi_5d_pct    = r.oi_5d_chg_pct;
+    if (r.price_chg    == null && r.chg            != null) r.price_chg    = r.chg;
+    if (r.price_5d_pct == null && r.price_5d_chg_pct != null) r.price_5d_pct = r.price_5d_chg_pct;
+    return r;
+  }
+  allFutures.forEach(tpNormaliseFutRow);
+  nearMonth.forEach(tpNormaliseFutRow);
+  midMonth.forEach(tpNormaliseFutRow);
+  farMonth.forEach(tpNormaliseFutRow);
+  allExpiry.forEach(tpNormaliseFutRow);
+
+  // Rollover rows: v3 schema has different keys entirely from what
+  // renderRollover expects. Normalise every field so the table populates.
+  // v3 keys:  symbol, rollover_pct, oi_near, oi_next, cost_of_carry, bias,
+  //           ltp_near, ltp_next, expiry_near, expiry_next
+  // v2/UI expects: rolled_pct, near_oi, mid_oi, roll_cost_pct, lot, type,
+  //           near_expiry, mid_expiry, near_basis_pct, mid_basis_pct, days_to_near
+  const fmByFut = {};
+  allExpiry.forEach(f => { if (f.symbol && !fmByFut[f.symbol]) fmByFut[f.symbol] = f; });
+
+  rollover.forEach(r => {
+    if (r.rolled_pct      == null && r.rollover_pct  != null) r.rolled_pct      = r.rollover_pct;
+    if (r.near_oi         == null && r.oi_near       != null) r.near_oi         = r.oi_near;
+    if (r.mid_oi          == null && r.oi_next       != null) r.mid_oi          = r.oi_next;
+    if (r.roll_cost_pct   == null && r.cost_of_carry != null) r.roll_cost_pct   = r.cost_of_carry;
+    if (r.near_expiry     == null && r.expiry_near   != null) r.near_expiry     = r.expiry_near;
+    if (r.mid_expiry      == null && r.expiry_next   != null) r.mid_expiry      = r.expiry_next;
+
+    // Enrich from matching futures row (lot size, type, basis%, days to expiry)
+    const fr = fmByFut[r.symbol];
+    if (fr) {
+      if (r.lot   == null) r.lot   = fr.lot_size;
+      if (r.type  == null) r.type  = fr.instrument === 'FUTIDX' ? 'IDX' : 'STK';
+      if (r.near_basis_pct == null) r.near_basis_pct = fr.basis_pct;
+      if (r.days_to_near   == null) r.days_to_near   = fr.days_to_exp;
+    }
+    if (r.lot  == null) r.lot  = '—';
+    if (r.type == null) r.type = 'STK';
+  });
+
   // tracker = near month for dashboard/OI/basis (backward compat)
   const tracker = nearMonth;
 
@@ -638,8 +685,18 @@ function processData(raw) {
     signalCounts,
     signalItems,
     basisCats,
-    basisSummary: raw.basis_summary || [],
-    oiMovers:    raw.oi_movers || { gainers:[], losers:[] },
+    // v3 has no raw.basis_summary; derive directly from nearMonth rows
+    // since every futures row already carries basis/basis_pct/fair_value/fv_diff
+    basisSummary: raw.basis_summary || nearMonth,
+    // v3 has no raw.oi_movers; derive top-25 gainers/losers from nearMonth
+    // (which has all 214 rows, vs market_summary's top-5 only)
+    oiMovers: (() => {
+      if (raw.oi_movers) return raw.oi_movers;   // v2 passthrough
+      const withOiChg = nearMonth.filter(r => r.oi_chg_pct != null);
+      const gainers = [...withOiChg].sort((a,b)=>(b.oi_chg_pct||0)-(a.oi_chg_pct||0)).slice(0,25);
+      const losers  = [...withOiChg].sort((a,b)=>(a.oi_chg_pct||0)-(b.oi_chg_pct||0)).slice(0,25);
+      return { gainers, losers };
+    })(),
     alerts,
     banList,
     allSymbolMap,
