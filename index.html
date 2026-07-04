@@ -1379,11 +1379,26 @@ function renderRollover(el) {
   const low  = rvData.filter(r => r.rolled_pct < 20 && r.mid_oi > 0).length;
   const avgRolled = rvData.length ? (rvData.reduce((s,r) => s + r.rolled_pct, 0) / rvData.length).toFixed(1) : 0;
 
+  // Detect expiry day: all near OI = 0 because contracts have wound down
+  const isExpiryDay = rvData.length > 0 &&
+    rvData.every(r => (r.near_oi || r.rolled_pct || 0) === 0);
+
   let html = `
     <div class="refresh-bar">
       <button class="refresh-btn" onclick="loadData()">🔄 Refresh</button>
       <span class="source-info">${rvData.length} symbols · Near: ${expiries.near||'—'} → Mid: ${expiries.mid||'—'}</span>
     </div>
+
+    ${isExpiryDay ? `<div style="background:#2a1a00;border:1px solid #7a4a00;
+        border-radius:8px;padding:10px 14px;margin-bottom:10px;
+        font-size:13px;color:#f59e0b;line-height:1.6">
+        📅 <strong>Today is Expiry Day (${appData.meta?.date_fmt||''}).</strong>
+        Near-month contracts expire today — OI has wound down to zero, so rollover%
+        shows 0 for all symbols. This is expected.
+        <br>From <strong>tomorrow</strong>, what is currently Mid-month (Jul) becomes the
+        new Near-month, and new Far-month (Aug/Sep) builds as Mid. Rollover data
+        will re-populate once the new contracts start accumulating OI.
+      </div>` : ''}
 
     <!-- Summary bar -->
     <div style="display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap;">
@@ -2210,7 +2225,12 @@ function renderOptionsRows() {
   if (!tbody) return;
 
   if (optTab === 'straddle') {
-    let rows = [...(os.straddle || [])];
+    // Enrich rows: derive combined & max_roi_pct if zero (serializer key mismatch)
+    let rows = (os.straddle || []).map(r => {
+      const comb = (r.combined || 0) || ((r.ce_prem||0) + (r.pe_prem||0));
+      const roi  = (r.max_roi_pct || 0) || (r.investment > 0 ? (r.max_profit||0) / r.investment * 100 : 0);
+      return {...r, combined: comb, max_roi_pct: roi};
+    });
     rows.sort((a,b) => optSort === 'sym' ? (a.symbol||'').localeCompare(b.symbol||'')
                       : optSort === 'iv'  ? (b.iv_atm||0)-(a.iv_atm||0)
                       : (b.max_roi_pct||0)-(a.max_roi_pct||0));
@@ -2251,7 +2271,12 @@ function renderOptionsRows() {
     tbody.innerHTML = html;
 
   } else {
-    let rows = [...(os.covered_call || [])];
+    // Enrich CC rows: derive max_roi_pct if zero
+    let rows = (os.covered_call || []).map(r => {
+      const roi = (r.max_roi_pct || 0) || (r.investment > 0 ? (r.max_profit||0) / r.investment * 100 : 0);
+      const ds  = (r.downside_pct || r.safety_pct || 0);
+      return {...r, max_roi_pct: roi, downside_pct: ds};
+    });
     rows.sort((a,b) => optSort === 'sym' ? (a.symbol||'').localeCompare(b.symbol||'')
                       : optSort === 'iv'  ? (b.iv_atm||0)-(a.iv_atm||0)
                       : (b.max_roi_pct||0)-(a.max_roi_pct||0));
@@ -2375,18 +2400,25 @@ function tpScoreStraddle(r, futMap) {
   const trend = (f.signal||f.trend||f.SIGNAL||f.TREND||'').toUpperCase();
   if (trend === 'SB') return null;  // disqualify — strong bearish buildup
 
-  const roi    = parseFloat(r.max_roi_pct  || 0);
+  // Fallback computations: serializer key-mismatch (C+P vs combined, etc.)
+  // means combined/roi/lot_size may be 0 in snapshot — derive from raw fields
+  const cePrem = parseFloat(r.ce_prem      || 0);
+  const pePrem = parseFloat(r.pe_prem      || 0);
   const ceOI   = parseInt  (r.ce_oi        || 0);
   const peOI   = parseInt  (r.pe_oi        || 0);
   const totOI  = ceOI + peOI;
   const inv    = parseFloat(r.investment   || 0);
-  const comb   = parseFloat(r.combined     || 0);
+  const comb   = parseFloat(r.combined     || 0) || (cePrem + pePrem);
+  const mxProf = parseFloat(r.max_profit   || 0);
+  const roi    = parseFloat(r.max_roi_pct  || 0) || (inv > 0 ? mxProf / inv * 100 : 0);
   const spot   = parseFloat(r.spot         || 0);
   const beLo   = parseFloat(r.be_lower     || 0);
   const beHi   = parseFloat(r.be_upper     || 0);
   const chgAbs = Math.abs(parseFloat(f.chg_pct||f.CHG_PCT||0));
 
-  if (inv === 0 || comb === 0 || totOI < 100) return null;
+  // totOI check kept; remove comb===0 since we derived it above
+  if (inv === 0 || totOI < 100) return null;
+  if (comb === 0) return null;  // still skip if truly no premium data
   if (chgAbs > 8) return null;   // event-driven — skip
   if (inv > 1_000_000) return null; // >10L capital
 
@@ -2422,16 +2454,19 @@ function tpScoreCC(r, futMap) {
   const trend = (f.signal||f.trend||f.SIGNAL||f.TREND||'').toUpperCase();
   if (trend === 'SB') return null;
 
-  const roi    = parseFloat(r.max_roi_pct  || 0);
-  const ds     = parseFloat(r.downside_pct || 0);
+  const cePrem = parseFloat(r.ce_prem      || 0);
   const ceOI   = parseInt  (r.ce_oi        || 0);
   const inv    = parseFloat(r.investment   || 0);
   const spot   = parseFloat(r.spot         || 0);
   const strike = parseFloat(r.strike       || 0);
-  const cePrem = parseFloat(r.ce_prem      || 0);
+  const mxProf = parseFloat(r.max_profit   || 0);
+  const ds     = parseFloat(r.downside_pct || r.safety_pct || 0);
+  const roi    = parseFloat(r.max_roi_pct  || 0) || (inv > 0 ? mxProf / inv * 100 : 0);
   const chgAbs = Math.abs(parseFloat(f.chg_pct||f.CHG_PCT||0));
 
-  if (inv === 0 || cePrem === 0 || ceOI < 50) return null;
+  // Relax ce_oi filter — serializer bug causes ce_oi=0; use cePrem as proxy
+  if (inv === 0 || cePrem === 0) return null;
+  if (ceOI > 0 && ceOI < 50) return null;  // only apply if ce_oi was actually populated
   if (chgAbs > 8) return null;
   if (inv > 1_000_000) return null;
 
@@ -2439,7 +2474,9 @@ function tpScoreCC(r, futMap) {
 
   const sRoi = Math.min(25, roi * 2.5);
   const sDs  = Math.min(25, Math.max(0, ds) * 5);
-  const sLiq = Math.min(20, Math.log10(Math.max(ceOI,1)) / Math.log10(5000) * 20);
+  // If ceOI=0 (serializer bug), use cePrem as a rough liquidity proxy
+  const _liqBase = ceOI > 0 ? ceOI : Math.min(5000, cePrem * 50);
+  const sLiq = Math.min(20, Math.log10(Math.max(_liqBase,1)) / Math.log10(5000) * 20);
   const sTr  = TP_TREND_CC[trend] ?? 10;
   const sOtm = Math.min(10, Math.max(0, 10 - Math.abs(otmPct - 3)));
   const total = sRoi + sDs + sLiq + sTr + sOtm;
